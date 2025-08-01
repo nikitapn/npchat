@@ -1,0 +1,95 @@
+namespace npchat {
+
+using bytestream = vector<u8>;
+
+using UserId = u32;
+using ChatId = u32;
+using MessageId = u32;
+
+enum AuthorizationError {
+  InvalidCredentials = 0,
+  AccessDenied = 1,
+};
+
+AuthorizationFailed: exception {
+  reason: AuthorizationError;
+}
+
+enum RegistrationError: u8 {
+  UsernameAlreadyTaken,
+  EmailAlreadyTaken,
+  InvorrectCode,
+  InvalidUsername,
+}
+
+RegistrationFailed: exception {
+  reason: RegistrationError;
+}
+
+UserData: flat {
+  name: string;
+  sessionId: string;
+  db: object; // RegisteredUser
+}
+
+enum ChatAttachmentType {
+  Picture,
+  File
+}
+
+ChatAttachment: flat {
+  type: ChatAttachmentType;
+  name: string;
+  data: bytestream;
+}
+
+ChatMessage: flat {
+  chatId: ChatId;
+  timestamp: u32;
+  str: string;
+  attachment?: ChatAttachment;
+}
+
+Contact: flat {
+  id: UserId;
+  name: string;
+  avatar?: bytestream;
+}
+
+using ContactList = vector<Contact>;
+
+[trusted=false]
+interface RegisteredUser {
+  ContactList GetContacts();
+  MessageId SendMessage(chatId: in ChatId, message: in ChatMessage);
+}
+
+interface ChatListener {
+  void OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
+  void OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
+  void OnContactListUpdated(contacts: in ContactList);
+}
+
+[trusted=false]
+interface Authorizator {
+  UserData LogIn(login: in string, password: in string)
+    raises(AuthorizationFailed);
+  UserData LogInWithSessionId(session_id: in string)
+    raises(AuthorizationFailed);
+  boolean LogOut(session_id: in string);
+
+  boolean CheckUsername(username: in string);
+  boolean CheckEmail(email: in string);
+
+  /**
+    * Registers a new user in two steps:
+    * 1. RegisterStepOne: registers the user with username, email, and password.
+    * 2. RegisterStepTwo: completes the registration with a verification code.
+    */
+  void RegisterStepOne(username: in string, email: in string, password: in string)
+    raises(RegistrationFailed);
+  void RegisterStepTwo(username: in string, code: in u32)
+    raises(RegistrationFailed);
+}
+
+}
