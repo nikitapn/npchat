@@ -10,6 +10,15 @@ add_executable(npchat
   ${npchat_stub_GENERATED_HEADERS}
   ${npchat_stub_GENERATED_SOURCES}
   src/main.cpp
+
+  src/services/db/Database.hpp
+  src/services/db/AuthService.hpp
+  src/services/db/ChatService.hpp
+  src/services/db/ContactService.hpp
+  src/services/db/MessageService.hpp
+
+  src/services/rpc/Authorizator.hpp
+  src/services/rpc/Authorizator.cpp
 )
 
 target_link_libraries(npchat PRIVATE

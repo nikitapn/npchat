@@ -1,0 +1,312 @@
+#pragma once
+
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <mutex>
+#include <sqlite3.h>
+#include <spdlog/spdlog.h>
+#include "Database.hpp"
+#include "npchat_stub/npchat.hpp"
+
+class ChatService {
+private:
+  std::shared_ptr<Database> db_;
+  mutable std::mutex mutex_;
+  
+  // Prepared statements
+  sqlite3_stmt* insert_message_stmt_;
+  sqlite3_stmt* get_messages_stmt_;
+  sqlite3_stmt* get_message_by_id_stmt_;
+  sqlite3_stmt* mark_delivered_stmt_;
+  sqlite3_stmt* get_chat_participants_stmt_;
+  sqlite3_stmt* create_chat_stmt_;
+  sqlite3_stmt* add_participant_stmt_;
+  sqlite3_stmt* get_user_chats_stmt_;
+  sqlite3_stmt* insert_attachment_stmt_;
+  sqlite3_stmt* get_attachment_stmt_;
+
+  std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> chat_participants_cache_;
+
+public:
+  explicit ChatService(const std::shared_ptr<Database>& database) : db_(database) {
+    insert_message_stmt_ = db_->prepareStatement(
+      "INSERT INTO messages (chat_id, sender_id, content, timestamp, attachment_id) VALUES (?, ?, ?, ?, ?)");
+    
+    get_messages_stmt_ = db_->prepareStatement(
+      "SELECT m.id, m.chat_id, m.sender_id, m.content, m.timestamp, m.attachment_id, "
+      "       u.username, a.type, a.name, a.data "
+      "FROM messages m "
+      "JOIN users u ON m.sender_id = u.id "
+      "LEFT JOIN attachments a ON m.attachment_id = a.id "
+      "WHERE m.chat_id = ? ORDER BY m.timestamp ASC LIMIT ? OFFSET ?");
+    
+    get_message_by_id_stmt_ = db_->prepareStatement(
+      "SELECT m.id, m.chat_id, m.sender_id, m.content, m.timestamp, m.attachment_id, "
+      "       u.username, a.type, a.name, a.data "
+      "FROM messages m "
+      "JOIN users u ON m.sender_id = u.id "
+      "LEFT JOIN attachments a ON m.attachment_id = a.id "
+      "WHERE m.id = ?");
+    
+    mark_delivered_stmt_ = db_->prepareStatement(
+      "INSERT OR IGNORE INTO message_delivery (message_id, user_id, delivered_at) VALUES (?, ?, ?)");
+    
+    get_chat_participants_stmt_ = db_->prepareStatement(
+      "SELECT user_id FROM chat_participants WHERE chat_id = ?");
+    
+    create_chat_stmt_ = db_->prepareStatement(
+      "INSERT INTO chats (created_by, created_at) VALUES (?, ?)");
+    
+    add_participant_stmt_ = db_->prepareStatement(
+      "INSERT INTO chat_participants (chat_id, user_id, joined_at) VALUES (?, ?, ?)");
+    
+    get_user_chats_stmt_ = db_->prepareStatement(
+      "SELECT DISTINCT c.id, c.created_by, c.created_at "
+      "FROM chats c "
+      "JOIN chat_participants cp ON c.id = cp.chat_id "
+      "WHERE cp.user_id = ?");
+    
+    insert_attachment_stmt_ = db_->prepareStatement(
+      "INSERT INTO attachments (type, name, data) VALUES (?, ?, ?)");
+    
+    get_attachment_stmt_ = db_->prepareStatement(
+      "SELECT type, name, data FROM attachments WHERE id = ?");
+  }
+
+  ~ChatService() {
+    sqlite3_finalize(insert_message_stmt_);
+    sqlite3_finalize(get_messages_stmt_);
+    sqlite3_finalize(get_message_by_id_stmt_);
+    sqlite3_finalize(mark_delivered_stmt_);
+    sqlite3_finalize(get_chat_participants_stmt_);
+    sqlite3_finalize(create_chat_stmt_);
+    sqlite3_finalize(add_participant_stmt_);
+    sqlite3_finalize(get_user_chats_stmt_);
+    sqlite3_finalize(insert_attachment_stmt_);
+    sqlite3_finalize(get_attachment_stmt_);
+  }
+
+  std::uint32_t createChat(std::uint32_t creator_id, const std::vector<std::uint32_t>& participant_ids) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    // Create chat
+    sqlite3_bind_int(create_chat_stmt_, 1, creator_id);
+    sqlite3_bind_int64(create_chat_stmt_, 2, timestamp);
+    
+    if (sqlite3_step(create_chat_stmt_) != SQLITE_DONE) {
+      sqlite3_reset(create_chat_stmt_);
+      throw std::runtime_error("Failed to create chat");
+    }
+    
+    std::uint32_t chat_id = static_cast<std::uint32_t>(sqlite3_last_insert_rowid(db_->getConnection()));
+    sqlite3_reset(create_chat_stmt_);
+    
+    // Add creator as participant
+    sqlite3_bind_int(add_participant_stmt_, 1, chat_id);
+    sqlite3_bind_int(add_participant_stmt_, 2, creator_id);
+    sqlite3_bind_int64(add_participant_stmt_, 3, timestamp);
+    sqlite3_step(add_participant_stmt_);
+    sqlite3_reset(add_participant_stmt_);
+    
+    // Add other participants
+    for (std::uint32_t participant_id : participant_ids) {
+      if (participant_id != creator_id) {
+        sqlite3_bind_int(add_participant_stmt_, 1, chat_id);
+        sqlite3_bind_int(add_participant_stmt_, 2, participant_id);
+        sqlite3_bind_int64(add_participant_stmt_, 3, timestamp);
+        sqlite3_step(add_participant_stmt_);
+        sqlite3_reset(add_participant_stmt_);
+      }
+    }
+    
+    // Update cache
+    std::vector<std::uint32_t> participants;
+    participants.push_back(creator_id);
+    for (auto id : participant_ids) {
+      if (id != creator_id) {
+        participants.push_back(id);
+      }
+    }
+    chat_participants_cache_[chat_id] = std::move(participants);
+    
+    return chat_id;
+  }
+
+  npchat::MessageId sendMessage(std::uint32_t sender_id, npchat::ChatId chat_id, const npchat::ChatMessage& message) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Verify sender is participant
+    auto participants = getChatParticipants(chat_id);
+    if (std::find(participants.begin(), participants.end(), sender_id) == participants.end()) {
+      throw std::runtime_error("User is not a participant in this chat");
+    }
+    
+    std::uint32_t attachment_id = 0;
+    
+    // Handle attachment if present
+    if (message.attachment.has_value()) {
+      const auto& attachment = message.attachment.value();
+      
+      sqlite3_bind_int(insert_attachment_stmt_, 1, static_cast<int>(attachment.type));
+      sqlite3_bind_text(insert_attachment_stmt_, 2, attachment.name.c_str(), -1, SQLITE_STATIC);
+      sqlite3_bind_blob(insert_attachment_stmt_, 3, attachment.data.data(), attachment.data.size(), SQLITE_STATIC);
+      
+      if (sqlite3_step(insert_attachment_stmt_) == SQLITE_DONE) {
+        attachment_id = static_cast<std::uint32_t>(sqlite3_last_insert_rowid(db_->getConnection()));
+      }
+      sqlite3_reset(insert_attachment_stmt_);
+    }
+    
+    // Insert message
+    sqlite3_bind_int(insert_message_stmt_, 1, chat_id);
+    sqlite3_bind_int(insert_message_stmt_, 2, sender_id);
+    sqlite3_bind_text(insert_message_stmt_, 3, message.str.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int64(insert_message_stmt_, 4, message.timestamp);
+    if (attachment_id > 0) {
+      sqlite3_bind_int(insert_message_stmt_, 5, attachment_id);
+    } else {
+      sqlite3_bind_null(insert_message_stmt_, 5);
+    }
+    
+    if (sqlite3_step(insert_message_stmt_) != SQLITE_DONE) {
+      sqlite3_reset(insert_message_stmt_);
+      throw std::runtime_error("Failed to send message");
+    }
+    
+    npchat::MessageId message_id = static_cast<npchat::MessageId>(sqlite3_last_insert_rowid(db_->getConnection()));
+    sqlite3_reset(insert_message_stmt_);
+    
+    return message_id;
+  }
+
+  std::vector<npchat::ChatMessage> getMessages(npchat::ChatId chat_id, std::uint32_t limit = 50, std::uint32_t offset = 0) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::vector<npchat::ChatMessage> messages;
+    
+    sqlite3_bind_int(get_messages_stmt_, 1, chat_id);
+    sqlite3_bind_int(get_messages_stmt_, 2, limit);
+    sqlite3_bind_int(get_messages_stmt_, 3, offset);
+    
+    while (sqlite3_step(get_messages_stmt_) == SQLITE_ROW) {
+      npchat::ChatMessage msg;
+      msg.chatId = sqlite3_column_int(get_messages_stmt_, 1);
+      msg.timestamp = sqlite3_column_int64(get_messages_stmt_, 4);
+      msg.str = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 3));
+      
+      // Handle attachment if present
+      if (sqlite3_column_type(get_messages_stmt_, 5) != SQLITE_NULL) {
+        npchat::ChatAttachment attachment;
+        attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_messages_stmt_, 7));
+        attachment.name = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 8));
+        
+        const void* blob_data = sqlite3_column_blob(get_messages_stmt_, 9);
+        int blob_size = sqlite3_column_bytes(get_messages_stmt_, 9);
+        attachment.data.assign(
+          static_cast<const std::uint8_t*>(blob_data),
+          static_cast<const std::uint8_t*>(blob_data) + blob_size
+        );
+        
+        msg.attachment = attachment;
+      }
+      
+      messages.push_back(std::move(msg));
+    }
+    
+    sqlite3_reset(get_messages_stmt_);
+    return messages;
+  }
+
+  std::optional<npchat::ChatMessage> getMessageById(npchat::MessageId message_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    sqlite3_bind_int(get_message_by_id_stmt_, 1, message_id);
+    
+    if (sqlite3_step(get_message_by_id_stmt_) == SQLITE_ROW) {
+      npchat::ChatMessage msg;
+      msg.chatId = sqlite3_column_int(get_message_by_id_stmt_, 1);
+      msg.timestamp = sqlite3_column_int64(get_message_by_id_stmt_, 4);
+      msg.str = reinterpret_cast<const char*>(sqlite3_column_text(get_message_by_id_stmt_, 3));
+      
+      // Handle attachment if present
+      if (sqlite3_column_type(get_message_by_id_stmt_, 5) != SQLITE_NULL) {
+        npchat::ChatAttachment attachment;
+        attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_message_by_id_stmt_, 7));
+        attachment.name = reinterpret_cast<const char*>(sqlite3_column_text(get_message_by_id_stmt_, 8));
+        
+        const void* blob_data = sqlite3_column_blob(get_message_by_id_stmt_, 9);
+        int blob_size = sqlite3_column_bytes(get_message_by_id_stmt_, 9);
+        attachment.data.assign(
+          static_cast<const std::uint8_t*>(blob_data),
+          static_cast<const std::uint8_t*>(blob_data) + blob_size
+        );
+        
+        msg.attachment = attachment;
+      }
+      
+      sqlite3_reset(get_message_by_id_stmt_);
+      return msg;
+    }
+    
+    sqlite3_reset(get_message_by_id_stmt_);
+    return std::nullopt;
+  }
+
+  void markMessageDelivered(npchat::MessageId message_id, std::uint32_t user_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+    
+    sqlite3_bind_int(mark_delivered_stmt_, 1, message_id);
+    sqlite3_bind_int(mark_delivered_stmt_, 2, user_id);
+    sqlite3_bind_int64(mark_delivered_stmt_, 3, timestamp);
+    
+    sqlite3_step(mark_delivered_stmt_);
+    sqlite3_reset(mark_delivered_stmt_);
+  }
+
+  std::vector<std::uint32_t> getChatParticipants(npchat::ChatId chat_id) {
+    // Check cache first
+    auto it = chat_participants_cache_.find(chat_id);
+    if (it != chat_participants_cache_.end()) {
+      return it->second;
+    }
+    
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::vector<std::uint32_t> participants;
+    
+    sqlite3_bind_int(get_chat_participants_stmt_, 1, chat_id);
+    
+    while (sqlite3_step(get_chat_participants_stmt_) == SQLITE_ROW) {
+      participants.push_back(sqlite3_column_int(get_chat_participants_stmt_, 0));
+    }
+    
+    sqlite3_reset(get_chat_participants_stmt_);
+    
+    // Update cache
+    chat_participants_cache_[chat_id] = participants;
+    
+    return participants;
+  }
+
+  std::vector<npchat::ChatId> getUserChats(std::uint32_t user_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::vector<npchat::ChatId> chats;
+    
+    sqlite3_bind_int(get_user_chats_stmt_, 1, user_id);
+    
+    while (sqlite3_step(get_user_chats_stmt_) == SQLITE_ROW) {
+      chats.push_back(sqlite3_column_int(get_user_chats_stmt_, 0));
+    }
+    
+    sqlite3_reset(get_user_chats_stmt_);
+    return chats;
+  }
+};

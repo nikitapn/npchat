@@ -5,6 +5,15 @@
     "optional": "cpp",
     "format": "cpp",
     "system_error": "cpp",
-    "regex": "cpp"
+    "regex": "cpp",
+    "array": "cpp",
+    "string": "cpp",
+    "string_view": "cpp",
+    "ranges": "cpp",
+    "span": "cpp",
+    "coroutine": "cpp",
+    "text_encoding": "cpp",
+    "typeindex": "cpp",
+    "typeinfo": "cpp"
   }
 }

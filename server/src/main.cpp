@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include <nprpc/nprpc.hpp>
+#include <nprpc/serialization/oarchive.h>
 
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
@@ -17,13 +18,21 @@
 
 #include "services/boost/di.hpp"
 #include "services/db/Database.hpp"
+#include "services/db/AuthService.hpp"
+#include "services/rpc/Authorizator.hpp"
+
 #include "util/util.hpp"
+
+#include "util/HostJsonMacros.hpp"
+
+DEFINE_HOST_JSON_STRUCT(authorizator)
 
 int main(int argc, char *argv[]) {
   namespace di = boost::di;
   namespace po = boost::program_options;
   namespace fs = std::filesystem;
 
+  HostJson host_json;
   std::string hostname, http_dir, data_dir, public_cert, private_key, dh_params;
   unsigned short port;
   bool log_trace = false;
@@ -66,17 +75,9 @@ int main(int argc, char *argv[]) {
       .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
       .set_listen_http_port(port)
       .set_http_root_dir(http_dir)
-      .set_hostname(hostname)
-      .set_spa_links({
-        "/calculator",
-        "/solutions",
-        "/fertilizers",
-        "/links",
-        "/chat",
-        "/about"
-      });
+      .set_hostname(hostname);
 
-    if (public_cert.empty() ^ private_key.empty() == true)
+    if (public_cert.empty() || private_key.empty())
       throw std::runtime_error("Certificate and private key paths must be provided when using SSL.");
 
     bool use_ssl = !public_cert.empty();
@@ -89,24 +90,24 @@ int main(int argc, char *argv[]) {
     auto firstInjector = [&] () { return di::make_injector(
       di::bind<>().to(*rpc),
       di::bind<Database>().in(di::singleton).to<Database>(
-        (data_path / "npchat.db").generic_string()
+        (data_path / "npchat.sqlite3").generic_string()
       )
     );};
 
     auto injector = firstInjector();
 
-    // auto solutionService = injector.create<std::shared_ptr<SolutionService>>();
+    auto authService = injector.create<std::shared_ptr<AuthService>>();
     // auto fertilizerService = injector.create<std::shared_ptr<FertilizerService>>();
     // auto calculationService = injector.create<std::shared_ptr<CalculationService>>();
     // auto userService = injector.create<std::shared_ptr<UserService>>();
 
-    // auto injector2 = di::make_injector(
-    //   firstInjector(),
-    //   di::bind<>().to(solutionService),
+    auto injector2 = di::make_injector(
+      firstInjector(),
+      di::bind<>().to(authService)
     //   di::bind<>().to(fertilizerService),
     //   di::bind<>().to(calculationService),
     //   di::bind<>().to(userService)
-    // );
+    );
 
     // static poa
     auto poa = nprpc::PoaBuilder(rpc)
@@ -114,10 +115,7 @@ int main(int argc, char *argv[]) {
 		  .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
 		  .build();
 
-    // auto calc = injector2.create<std::shared_ptr<CalculatorImpl>>();
-    // auto authorizator = injector2.create<std::shared_ptr<AuthorizatorImpl>>();
-    // auto chat = injector2.create<std::shared_ptr<ChatImpl>>();
-    // auto proxy = injector2.create<std::shared_ptr<ProxyImpl>>();
+    auto authorizator = injector2.create<std::shared_ptr<AuthorizatorImpl>>();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown
     boost::asio::signal_set signals(thread_pool::get_instance().executor(), SIGINT, SIGTERM);
@@ -125,27 +123,13 @@ int main(int argc, char *argv[]) {
       thread_pool::get_instance().stop();
     });
 
-
     // Forbid unsecured WebSocket connections when SSL is enabled
     const auto flags = use_ssl ? nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET
       : nprpc::ObjectActivationFlags::ALLOW_WEBSOCKET;
 
-    // host_json.secured = use_ssl;
-    // host_json.objects.calculator = poa->activate_object(calc.get(), flags);
-    // host_json.objects.authorizator = poa->activate_object(authorizator.get(), flags);
-    // host_json.objects.chat = poa->activate_object(chat.get(), flags);
-    // host_json.objects.proxy = poa->activate_object(proxy.get(), flags);
-
-    // spdlog::info("calculator  - poa: {}, oid: {}", calc->poa_index(), calc->oid());
-    // spdlog::info("authorizator  - poa: {}, oid: {}", authorizator->poa_index(), authorizator->oid());
-    // spdlog::info("chat  - poa: {}, oid: {}", chat->poa_index(), chat->oid());
-    // spdlog::info("proxy  - poa: {}, oid: {}", proxy->poa_index(), proxy->oid());
-
-    // {
-    //   std::ofstream os(fs::path(http_dir) / "host.json");
-    //   nprpc::serialization::json_oarchive oa(os);
-    //   oa << host_json;
-    // }
+    host_json.secured = use_ssl;
+    ACTIVATE_HOST_OBJECT(host_json, poa, authorizator, flags);
+    SAVE_HOST_JSON_TO_FILE(host_json, http_dir);
 
     thread_pool::get_instance().ctx().run();
     thread_pool::get_instance().wait();
