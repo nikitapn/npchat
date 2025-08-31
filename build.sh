@@ -2,11 +2,12 @@
 
 set -e
 
-USE_SSL=0
-BUILD_TYPE=Debug
+source .env
 
 cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake --build .build_local
+
+[ ! "$1" == "run" ] && exit 0
 
 CMD=(
     .build_local/${BUILD_TYPE}/npchat
