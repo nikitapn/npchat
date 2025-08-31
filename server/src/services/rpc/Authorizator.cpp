@@ -4,17 +4,20 @@
 #include "services/db/ContactService.hpp"
 #include "services/db/MessageService.hpp"
 #include "services/db/ChatService.hpp"
+#include "services/client/ChatObserver.hpp"
 
 AuthorizatorImpl::AuthorizatorImpl(nprpc::Rpc& rpc, 
                                    std::shared_ptr<AuthService> authService,
                                    std::shared_ptr<ContactService> contactService,
                                    std::shared_ptr<MessageService> messageService,
-                                   std::shared_ptr<ChatService> chatService)
+                                   std::shared_ptr<ChatService> chatService,
+                                   std::shared_ptr<ChatObservers> chatObservers)
   : rpc_(rpc)
   , authService_(authService)
   , contactService_(contactService)
   , messageService_(messageService)
   , chatService_(chatService)
+  , chatObservers_(chatObservers)
 {
   // Create POA for user objects (RegisteredUser instances)
   user_poa_ = nprpc::PoaBuilder(&rpc)
@@ -30,7 +33,8 @@ npchat::UserData AuthorizatorImpl::LogIn (::nprpc::flat::Span<char> login, ::npr
   std::uint32_t userId = authService_->getUserIdFromLogin(std::string_view(login));
   
   // Create a new RegisteredUser object
-  auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_, chatService_, userId);
+  auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_, 
+                                               chatService_, chatObservers_, userId);
   
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser, 
@@ -51,7 +55,8 @@ npchat::UserData AuthorizatorImpl::LogInWithSessionId (::nprpc::flat::Span<char>
   std::uint32_t userId = authService_->getUserIdFromSession(std::string_view(session_id));
   
   // Create a new RegisteredUser object
-  auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_, chatService_, userId);
+  auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_, 
+                                               chatService_, chatObservers_, userId);
   
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser, 

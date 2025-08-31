@@ -47,7 +47,7 @@ echo "Server is running with PID $PID"
 trap ctrl_c INT
 ctrl_c() {
     echo "Stopping Server with PID $PID..."
-    kill $PID
+    kill -SIGKILL $PID
     exit 0
 }
 

@@ -5,12 +5,14 @@
 class ContactService;
 class MessageService;
 class ChatService;
+class ChatObservers;
 
 class RegisteredUserImpl : public npchat::IRegisteredUser_Servant {
   nprpc::Rpc& rpc_;
   std::shared_ptr<ContactService> contactService_;
   std::shared_ptr<MessageService> messageService_;
   std::shared_ptr<ChatService> chatService_;
+  std::shared_ptr<ChatObservers> chatObservers_;
   std::uint32_t userId_;
   
 public:
@@ -18,6 +20,7 @@ public:
                      std::shared_ptr<ContactService> contactService,
                      std::shared_ptr<MessageService> messageService,
                      std::shared_ptr<ChatService> chatService,
+                     std::shared_ptr<ChatObservers> chatObservers,
                      std::uint32_t userId);
 
   // Contact management
@@ -33,6 +36,7 @@ public:
   virtual void LeaveChatParticipant(npchat::ChatId chatId, npchat::UserId userId) override;
   
   // Message operations
+  virtual void SubscribeToEvents(nprpc::Object* listener) override;
   virtual npchat::MessageId SendMessage(npchat::ChatId chatId, 
                                         npchat::flat::ChatMessage_Direct message) override;
   virtual npchat::MessageList GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) override;

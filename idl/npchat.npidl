@@ -68,6 +68,12 @@ using ContactList = vector<Contact>;
 using ChatList = vector<Chat>;
 using MessageList = vector<ChatMessage>;
 
+interface ChatListener {
+  void OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
+  void OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
+  void OnContactListUpdated(contacts: in ContactList);
+}
+
 [trusted=false]
 interface RegisteredUser {
   // Contact management
@@ -83,17 +89,13 @@ interface RegisteredUser {
   void LeaveChatParticipant(chatId: in ChatId, userId: in UserId);
   
   // Message operations
+  void SubscribeToEvents(listener: in object /* ChatListener */);
   MessageId SendMessage(chatId: in ChatId, message: in ChatMessage);
   MessageList GetChatHistory(chatId: in ChatId, limit: in u32, offset: in u32);
   u32 GetUnreadMessageCount();
   void MarkMessageAsRead(messageId: in MessageId);
 }
 
-interface ChatListener {
-  void OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
-  void OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
-  void OnContactListUpdated(contacts: in ContactList);
-}
 
 [trusted=false]
 interface Authorizator {

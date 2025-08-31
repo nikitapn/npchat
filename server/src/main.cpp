@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include <nprpc/nprpc.hpp>
+#include <nprpc/host_json.hpp>
 #include <nprpc/serialization/oarchive.h>
 
 #include <boost/asio/signal_set.hpp>
@@ -25,9 +26,9 @@
 #include "services/db/ChatService.hpp"
 
 #include "services/rpc/Authorizator.hpp"
+#include "services/client/ChatObserver.hpp"
 
 #include "util/util.hpp"
-#include "util/HostJsonMacros.hpp"
 
 DEFINE_HOST_JSON_STRUCT(authorizator)
 
@@ -104,13 +105,15 @@ int main(int argc, char *argv[]) {
     auto contactService = injector.create<std::shared_ptr<ContactService>>();
     auto messageService = injector.create<std::shared_ptr<MessageService>>();
     auto chatService = injector.create<std::shared_ptr<ChatService>>();
+    auto chatObservers = std::make_shared<ChatObservers>();
 
     auto injector2 = di::make_injector(
       firstInjector(),
       di::bind<>().to(authService),
       di::bind<>().to(contactService),
       di::bind<>().to(messageService),
-      di::bind<>().to(chatService)
+      di::bind<>().to(chatService),
+      di::bind<>().to(chatObservers)
     );
 
     // static poa

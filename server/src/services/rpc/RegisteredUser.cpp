@@ -2,17 +2,20 @@
 #include "services/db/ContactService.hpp"
 #include "services/db/MessageService.hpp"
 #include "services/db/ChatService.hpp"
+#include "services/client/ChatObserver.hpp"
 #include <spdlog/spdlog.h>
 
 RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc, 
                                        std::shared_ptr<ContactService> contactService,
                                        std::shared_ptr<MessageService> messageService,
                                        std::shared_ptr<ChatService> chatService,
+                                       std::shared_ptr<ChatObservers> chatObservers,
                                        std::uint32_t userId)
   : rpc_(rpc)
   , contactService_(contactService)
   , messageService_(messageService)
   , chatService_(chatService)
+  , chatObservers_(chatObservers)
   , userId_(userId)
 {
   spdlog::info("RegisteredUser created for user ID: {}", userId_);
@@ -105,7 +108,10 @@ npchat::ChatId RegisteredUserImpl::CreateChat() {
     std::vector<std::uint32_t> participants = {userId_};
     auto chatId = chatService_->createChat(userId_, participants);
     
-    spdlog::info("Created chat {} for user ID: {}", chatId, userId_);
+    // Register chat participants with the observer system
+    chatObservers_->add_chat_participants(chatId, participants);
+    
+    spdlog::info("Created chat {} for user ID: {}, registered with observers", chatId, userId_);
     return chatId;
   } catch (const std::exception& e) {
     spdlog::error("Error creating chat for user ID {}: {}", userId_, e.what());
@@ -142,6 +148,28 @@ void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::Use
 }
 
 // Message operations
+void RegisteredUserImpl::SubscribeToEvents(nprpc::Object* obj) {
+  spdlog::info("SubscribeToEvents called for user ID: {}", userId_);
+  
+  try {
+    if (auto listener = nprpc::narrow<npchat::ChatListener>(obj)) {
+      listener->add_ref();
+      listener->set_timeout(250);
+      
+      // Subscribe this user's listener to chat events
+      chatObservers_->subscribe_user(userId_, listener);
+      
+      spdlog::info("Successfully subscribed user ID: {} to chat events", userId_);
+    } else {
+      spdlog::error("Failed to narrow object to ChatListener for user ID: {}", userId_);
+      throw std::invalid_argument("Object is not a valid ChatListener");
+    }
+  } catch (const std::exception& e) {
+    spdlog::error("Error subscribing to events for user ID {}: {}", userId_, e.what());
+    throw;
+  }
+}
+
 npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId, 
                                                   npchat::flat::ChatMessage_Direct message) {
   spdlog::info("SendMessage called for user ID: {}, chat ID: {}", userId_, chatId);
@@ -149,13 +177,18 @@ npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
   try {
     // Convert flat message to regular ChatMessage for ChatService
     npchat::ChatMessage chatMessage;
-
     npchat::helpers::assign_from_flat_ChatMessage(message, chatMessage);
     chatMessage.chatId = chatId;
     
     auto messageId = chatService_->sendMessage(userId_, chatId, chatMessage);
     
-    spdlog::info("Message sent with ID: {} for user ID: {}, chat ID: {}", 
+    // Notify all chat participants about the new message
+    chatObservers_->notify_message_received(messageId, chatMessage);
+    
+    // Notify sender about successful delivery (this could be enhanced later)
+    chatObservers_->notify_message_delivered(chatId, messageId, userId_);
+    
+    spdlog::info("Message sent with ID: {} for user ID: {}, chat ID: {}, participants notified", 
                  messageId, userId_, chatId);
     return messageId;
   } catch (const std::exception& e) {
@@ -163,9 +196,7 @@ npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
                   userId_, chatId, e.what());
     throw;
   }
-}
-
-npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) {
+}npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) {
   spdlog::info("GetChatHistory called for user ID: {}, chat ID: {}, limit: {}, offset: {}", 
                userId_, chatId, limit, offset);
   
