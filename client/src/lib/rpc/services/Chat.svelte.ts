@@ -16,18 +16,34 @@ interface ChatUpdate {
 	unreadCount: number;
 }
 
+interface ChatHistory {
+	chatId: ChatId;
+	messages: ChatMessage[];
+	hasMore: boolean;
+	isLoading: boolean;
+	offset: number;
+}
+
 class ChatServiceImpl {
 	private chatListener: ChatListenerImpl | null = null;
 	private registeredUser: RegisteredUser | null = null;
+	
+	// Constants for pagination
+	private readonly MESSAGES_PER_PAGE = 50;
+	private readonly MAX_CACHED_MESSAGES = 200;
 	
 	// State for real-time notifications
 	public notifications = $state<ChatNotification[]>([]);
 	public chatUpdates = $state<Map<ChatId, ChatUpdate>>(new Map());
 	public activeChatId = $state<ChatId | null>(null);
 	
+	// State for chat histories with pagination
+	public chatHistories = $state<Map<ChatId, ChatHistory>>(new Map());
+	
 	// Callbacks for UI updates
 	private onNewMessageCallbacks = new Set<(notification: ChatNotification) => void>();
 	private onChatUpdateCallbacks = new Set<(chatId: ChatId, update: ChatUpdate) => void>();
+	private onHistoryLoadedCallbacks = new Set<(chatId: ChatId, history: ChatHistory) => void>();
 
 	async initialize() {
 		try {
@@ -61,10 +77,16 @@ class ChatServiceImpl {
 				console.error('Error removing global ChatListener:', error);
 			}
 		}
+		
+		// Clear all state
+		this.chatHistories.clear();
+		this.chatUpdates.clear();
+		this.notifications.length = 0;
+		this.activeChatId = null;
 	}
 
 	// Set the currently active chat (when user opens a specific chat)
-	setActiveChatId(chatId: ChatId | null) {
+	async setActiveChatId(chatId: ChatId | null) {
 		this.activeChatId = chatId;
 		
 		// Mark messages as read for active chat
@@ -72,6 +94,11 @@ class ChatServiceImpl {
 			const update = this.chatUpdates.get(chatId)!;
 			update.unreadCount = 0;
 			this.chatUpdates.set(chatId, update);
+		}
+
+		// Load chat history if not already loaded
+		if (chatId && !this.chatHistories.has(chatId)) {
+			await this.loadChatHistory(chatId);
 		}
 	}
 
@@ -91,6 +118,88 @@ class ChatServiceImpl {
 		return await this.registeredUser.SendMessage(chatId, chatMessage);
 	}
 
+	// Load chat history for a specific chat
+	private async loadChatHistory(chatId: ChatId, offset: number = 0): Promise<void> {
+		if (!this.registeredUser) {
+			throw new Error('Chat service not initialized');
+		}
+
+		// Get or create history entry
+		let history = this.chatHistories.get(chatId);
+		if (!history) {
+			history = {
+				chatId,
+				messages: [],
+				hasMore: true,
+				isLoading: false,
+				offset: 0
+			};
+			this.chatHistories.set(chatId, history);
+		}
+
+		// Prevent concurrent loading
+		if (history.isLoading) {
+			return;
+		}
+
+		history.isLoading = true;
+
+		try {
+			console.log(`Loading chat history for chat ${chatId}, offset: ${offset}, limit: ${this.MESSAGES_PER_PAGE}`);
+			
+			const messages = await this.registeredUser.GetChatHistory(chatId, this.MESSAGES_PER_PAGE, offset);
+			
+			if (offset === 0) {
+				// Initial load - replace messages
+				history.messages = messages;
+			} else {
+				// Pagination - prepend older messages
+				history.messages = [...messages, ...history.messages];
+			}
+
+			// Update pagination state
+			history.hasMore = messages.length === this.MESSAGES_PER_PAGE;
+			history.offset = offset + messages.length;
+
+			// Limit cache size to prevent memory issues
+			if (history.messages.length > this.MAX_CACHED_MESSAGES) {
+				const excess = history.messages.length - this.MAX_CACHED_MESSAGES;
+				history.messages = history.messages.slice(0, this.MAX_CACHED_MESSAGES);
+				// Adjust offset since we removed messages
+				history.offset = Math.max(0, history.offset - excess);
+			}
+
+			console.log(`Loaded ${messages.length} messages for chat ${chatId}. Total: ${history.messages.length}, hasMore: ${history.hasMore}`);
+
+			// Notify callbacks
+			this.onHistoryLoadedCallbacks.forEach(callback => callback(chatId, history!));
+
+		} catch (error) {
+			console.error('Failed to load chat history:', error);
+		} finally {
+			history.isLoading = false;
+		}
+	}
+
+	// Load more history (older messages) for pagination
+	async loadMoreHistory(chatId: ChatId): Promise<boolean> {
+		const history = this.chatHistories.get(chatId);
+		if (!history || !history.hasMore || history.isLoading) {
+			return false;
+		}
+
+		await this.loadChatHistory(chatId, history.offset);
+		return this.chatHistories.get(chatId)?.hasMore || false;
+	}
+
+	// Refresh chat history (reload from beginning)
+	async refreshChatHistory(chatId: ChatId): Promise<void> {
+		// Clear existing history
+		this.chatHistories.delete(chatId);
+		// Load fresh history
+		await this.loadChatHistory(chatId, 0);
+	}
+
 	// Handle incoming message notification
 	onMessageReceived(messageId: MessageId, message: ChatMessage) {
 		const notification: ChatNotification = {
@@ -102,6 +211,26 @@ class ChatServiceImpl {
 
 		// Add to global notifications
 		this.notifications.push(notification);
+		
+		// Add to chat history if it's loaded
+		const history = this.chatHistories.get(message.chatId);
+		if (history) {
+			// Check if message already exists (avoid duplicates)
+			const exists = history.messages.some(m => 
+				m.timestamp === message.timestamp && m.str === message.str
+			);
+			
+			if (!exists) {
+				history.messages.push(message);
+				
+				// Maintain cache size limit
+				if (history.messages.length > this.MAX_CACHED_MESSAGES) {
+					const excess = history.messages.length - this.MAX_CACHED_MESSAGES;
+					history.messages = history.messages.slice(excess);
+					history.offset = Math.max(0, history.offset - excess);
+				}
+			}
+		}
 		
 		// Update chat-specific info
 		const existingUpdate = this.chatUpdates.get(message.chatId);
@@ -146,9 +275,54 @@ class ChatServiceImpl {
 		return () => this.onChatUpdateCallbacks.delete(callback);
 	}
 
-	// Get messages for a specific chat (from notifications)
-	getMessagesForChat(chatId: ChatId): ChatNotification[] {
-		return this.notifications.filter(n => n.chatId === chatId);
+	// Subscribe to history loaded events
+	onHistoryLoaded(callback: (chatId: ChatId, history: ChatHistory) => void) {
+		this.onHistoryLoadedCallbacks.add(callback);
+		return () => this.onHistoryLoadedCallbacks.delete(callback);
+	}
+
+	// Get messages for a specific chat (from history or notifications)
+	getMessagesForChat(chatId: ChatId): ChatMessage[] {
+		const history = this.chatHistories.get(chatId);
+		if (history) {
+			return history.messages;
+		}
+		
+		// Fallback to notifications if history not loaded
+		return this.notifications
+			.filter(n => n.chatId === chatId)
+			.map(n => n.message);
+	}
+
+	// Get chat history object for a specific chat
+	getChatHistory(chatId: ChatId): ChatHistory | undefined {
+		return this.chatHistories.get(chatId);
+	}
+
+	// Check if chat history is currently loading
+	isChatHistoryLoading(chatId: ChatId): boolean {
+		return this.chatHistories.get(chatId)?.isLoading || false;
+	}
+
+	// Check if chat has more history to load
+	hasMoreHistory(chatId: ChatId): boolean {
+		return this.chatHistories.get(chatId)?.hasMore || false;
+	}
+
+	// Get current message count for a chat
+	getMessageCount(chatId: ChatId): number {
+		return this.chatHistories.get(chatId)?.messages.length || 0;
+	}
+
+	// Get pagination info for a chat
+	getPaginationInfo(chatId: ChatId) {
+		const history = this.chatHistories.get(chatId);
+		return {
+			messageCount: history?.messages.length || 0,
+			hasMore: history?.hasMore || false,
+			isLoading: history?.isLoading || false,
+			offset: history?.offset || 0
+		};
 	}
 
 	// Get unread count for a chat

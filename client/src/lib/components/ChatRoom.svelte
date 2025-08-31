@@ -154,22 +154,56 @@
 		});
 	}
 
-	// Convert chat notifications to UI messages
+	// Convert chat messages to UI messages
 	function updateMessages() {
-		const notifications = chatService.getMessagesForChat(currentChatId);
-		messages = notifications.map(notification => ({
-			id: notification.messageId,
-			text: notification.message.str,
-			timestamp: notification.timestamp,
+		const chatMessages = chatService.getMessagesForChat(currentChatId);
+		messages = chatMessages.map(message => ({
+			id: message.timestamp, // Use timestamp as temp ID if no messageId available
+			text: message.str,
+			timestamp: new Date(message.timestamp),
 			sender: 'Other User', // TODO: Get actual sender name from user ID
-			attachment: notification.message.attachment
+			attachment: message.attachment
 		}));
 	}
 
 	// Set this chat as active and load messages
-	function activateChat() {
-		chatService.setActiveChatId(currentChatId);
+	async function activateChat() {
+		await chatService.setActiveChatId(currentChatId);
 		updateMessages();
+	}
+
+	// Load more history for pagination
+	async function loadMoreHistory() {
+		const canLoadMore = await chatService.loadMoreHistory(currentChatId);
+		if (canLoadMore) {
+			updateMessages();
+		}
+		return canLoadMore;
+	}
+
+	// Check if we're near the top and should load more history
+	function handleScroll(event: Event) {
+		const container = event.target as HTMLElement;
+		const scrollTop = container.scrollTop;
+		const scrollThreshold = 100; // pixels from top
+
+		if (scrollTop <= scrollThreshold && 
+			chatService.hasMoreHistory(currentChatId) && 
+			!chatService.isChatHistoryLoading(currentChatId)) {
+			
+			// Store current scroll position to maintain scroll after loading
+			const prevScrollHeight = container.scrollHeight;
+			
+			loadMoreHistory().then((loaded) => {
+				if (loaded) {
+					// Maintain scroll position after new messages are added
+					setTimeout(() => {
+						const newScrollHeight = container.scrollHeight;
+						container.scrollTop = newScrollHeight - prevScrollHeight + scrollTop;
+					}, 0);
+				}
+			});
+		}
 	}
 
 	// Send a message
@@ -238,29 +272,25 @@
 	activateChat();
 
 	// Subscribe to new messages for this chat
-	const unsubscribe = chatService.onNewMessage((notification) => {
+	const unsubscribeNewMessage = chatService.onNewMessage((notification) => {
 		if (notification.chatId === currentChatId) {
-			// Add new message to the list
-			const newMsg: Message = {
-				id: notification.messageId,
-				text: notification.message.str,
-				timestamp: notification.timestamp,
-				sender: 'Other User', // TODO: Get actual sender name
-				attachment: notification.message.attachment
-			};
-			
-			// Check if message already exists (avoid duplicates)
-			if (!messages.find(m => m.id === notification.messageId)) {
-				messages.push(newMsg);
-				messages = [...messages]; // Trigger reactivity
-			}
+			// Update messages from the service (which now includes history)
+			updateMessages();
+		}
+	});
+
+	// Subscribe to history loaded events
+	const unsubscribeHistoryLoaded = chatService.onHistoryLoaded((chatId, history) => {
+		if (chatId === currentChatId) {
+			updateMessages();
 		}
 	});
 
 	// Cleanup when component is destroyed
 	$effect(() => {
 		return () => {
-			unsubscribe();
+			unsubscribeNewMessage();
+			unsubscribeHistoryLoaded();
 			// Don't set activeChatId to null here - let the parent component handle it
 		};
 	});
@@ -280,7 +310,20 @@
 	<!-- Messages Area -->
 	<div class="flex-1 overflow-hidden">
 		<div class="h-full flex flex-col">
-			<div class="flex-1 overflow-y-auto p-4 space-y-4" bind:this={messagesContainer}>
+			<div class="flex-1 overflow-y-auto p-4 space-y-4" bind:this={messagesContainer} onscroll={handleScroll}>
+				<!-- Loading indicator for history -->
+				{#if chatService.isChatHistoryLoading(currentChatId)}
+					<div class="flex justify-center py-2">
+						<div class="flex items-center space-x-2 text-gray-500">
+							<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							<span class="text-sm">Loading history...</span>
+						</div>
+					</div>
+				{/if}
+				
 				{#each messageGroups as group (group.timestamp.getTime())}
 					<div class="flex flex-col space-y-1 {group.isOwnMessage ? 'items-end' : 'items-start'}">
 						<!-- Group header with sender name and timestamp -->

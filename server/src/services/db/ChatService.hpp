@@ -232,20 +232,29 @@ public:
       npchat::ChatMessage msg;
       msg.chatId = sqlite3_column_int(get_messages_stmt_, 1);
       msg.timestamp = sqlite3_column_int64(get_messages_stmt_, 4);
-      msg.str = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 3));
+      
+      // Safely handle text content
+      const char* content_text = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 3));
+      msg.str = content_text ? content_text : "";
       
       // Handle attachment if present
       if (sqlite3_column_type(get_messages_stmt_, 5) != SQLITE_NULL) {
         npchat::ChatAttachment attachment;
         attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_messages_stmt_, 7));
-        attachment.name = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 8));
         
+        // Safely handle attachment name
+        const char* attachment_name = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 8));
+        attachment.name = attachment_name ? attachment_name : "";
+        
+        // Safely handle blob data
         const void* blob_data = sqlite3_column_blob(get_messages_stmt_, 9);
         int blob_size = sqlite3_column_bytes(get_messages_stmt_, 9);
-        attachment.data.assign(
-          static_cast<const std::uint8_t*>(blob_data),
-          static_cast<const std::uint8_t*>(blob_data) + blob_size
-        );
+        if (blob_data && blob_size > 0) {
+          attachment.data.assign(
+            static_cast<const std::uint8_t*>(blob_data),
+            static_cast<const std::uint8_t*>(blob_data) + blob_size
+          );
+        }
         
         msg.attachment = attachment;
       }

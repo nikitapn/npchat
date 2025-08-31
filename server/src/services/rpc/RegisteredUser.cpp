@@ -4,6 +4,7 @@
 #include "services/db/ChatService.hpp"
 #include "services/client/ChatObserver.hpp"
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc, 
                                        std::shared_ptr<ContactService> contactService,
@@ -255,13 +256,26 @@ npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, st
                userId_, chatId, limit, offset);
   
   try {
+    // First, verify that the user is a participant in this chat
+    auto participants = chatService_->getChatParticipants(chatId);
+    bool isParticipant = std::find(participants.begin(), participants.end(), userId_) != participants.end();
+    
+    if (!isParticipant) {
+      spdlog::warn("User {} attempted to access chat history for chat {} without being a participant", 
+                   userId_, chatId);
+      throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
+    }
+    
     auto messages = chatService_->getMessages(chatId, limit, offset);
     spdlog::info("Retrieved {} messages for chat {} by user ID: {}", messages.size(), chatId, userId_);
     return messages;
+  } catch (const npchat::ChatOperationFailed&) {
+    // Re-throw NPRPC exceptions as-is
+    throw;
   } catch (const std::exception& e) {
     spdlog::error("Error getting chat history for user ID {}, chat ID {}: {}", 
                   userId_, chatId, e.what());
-    throw;
+    throw npchat::ChatOperationFailed(npchat::ChatError::ChatNotFound);
   }
 }
 
