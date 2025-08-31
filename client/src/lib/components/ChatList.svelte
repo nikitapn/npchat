@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RegisteredUser, Chat, ChatList, ChatId } from '../rpc/npchat';
+	import { chatService } from '../rpc/services/Chat.svelte';
 
 	interface ChatListProps {
 		registeredUser: RegisteredUser | null;
@@ -43,11 +44,24 @@
 		}
 	}
 
+	// Subscribe to chat updates for real-time unread counts
+	const unsubscribe = chatService.onChatUpdate((chatId, update) => {
+		// Refresh chat list to show new chats that may have been created
+		if (!chats.find(c => c.id === chatId)) {
+			loadChats();
+		}
+	});
+
 	// Load chats when registeredUser becomes available
 	$effect(() => {
 		if (registeredUser) {
 			loadChats();
 		}
+	});
+
+	// Cleanup subscription
+	$effect(() => {
+		return unsubscribe;
 	});
 
 	// Handle create new chat click
@@ -70,6 +84,7 @@
 
 	<div class="space-y-2">
 		{#each chats as chat}
+			{@const unreadCount = chatService.getUnreadCount(chat.id)}
 			<button 
 				class="w-full flex justify-between items-center p-3 rounded-lg transition-colors {
 					currentChatId === chat.id 
@@ -79,13 +94,24 @@
 				onclick={() => onSelectChat(chat.id)}
 			>
 				<div class="flex items-center space-x-3">
-					<div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-						<span class="text-white font-medium">
-							#{chat.id}
-						</span>
+					<div class="relative">
+						<div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+							<span class="text-white font-medium">
+								#{chat.id}
+							</span>
+						</div>
+						{#if unreadCount > 0}
+							<div class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+								<span class="text-white text-xs font-bold">
+									{unreadCount > 9 ? '9+' : unreadCount}
+								</span>
+							</div>
+						{/if}
 					</div>
 					<div>
-						<div class="font-medium text-gray-900">Chat Room #{chat.id}</div>
+						<div class="font-medium text-gray-900 {unreadCount > 0 ? 'font-bold' : ''}">
+							Chat Room #{chat.id}
+						</div>
 						<div class="text-sm text-gray-500">
 							{chat.participantCount} participant{chat.participantCount !== 1 ? 's' : ''}
 						</div>

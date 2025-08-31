@@ -32,6 +32,7 @@ public:
   // Chat management  
   virtual npchat::ChatList GetChats() override;
   virtual npchat::ChatId CreateChat() override;
+  virtual npchat::ChatId CreateChatWith(npchat::UserId userId) override;
   virtual void AddChatParticipant(npchat::ChatId chatId, npchat::UserId userId) override;
   virtual void LeaveChatParticipant(npchat::ChatId chatId, npchat::UserId userId) override;
   

@@ -13,7 +13,7 @@ private:
   // Map chat ID to participating user IDs
   std::unordered_map<npchat::ChatId, std::unordered_set<std::uint32_t>> chat_participants_;
 
-  void on_message_received_impl(npchat::MessageId messageId, npchat::ChatMessage message, npchat::ChatId chatId) {
+  void on_message_received_impl(npchat::MessageId messageId, npchat::ChatMessage message, npchat::ChatId chatId, std::uint32_t senderId) {
     // Find all participants of this chat
     auto chat_it = chat_participants_.find(chatId);
     if (chat_it == chat_participants_.end()) {
@@ -22,7 +22,7 @@ private:
     
     // Notify all participants except the sender
     for (auto userId : chat_it->second) {
-      if (userId == message.chatId) continue; // Don't notify sender
+      if (userId == senderId) continue; // Don't notify sender
       
       auto user_it = user_listeners_.find(userId);
       if (user_it != user_listeners_.end()) {
@@ -113,8 +113,8 @@ public:
   }
   
   // Broadcast new message to chat participants
-  void notify_message_received(npchat::MessageId messageId, const npchat::ChatMessage& message) {
-    nplib::async<false>(executor(), &ChatObservers::on_message_received_impl, this, messageId, message, message.chatId);
+  void notify_message_received(npchat::MessageId messageId, const npchat::ChatMessage& message, std::uint32_t senderId) {
+    nplib::async<false>(executor(), &ChatObservers::on_message_received_impl, this, messageId, message, message.chatId, senderId);
   }
   
   // Notify sender about message delivery

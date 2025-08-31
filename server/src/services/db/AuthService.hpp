@@ -9,6 +9,7 @@
 #include <sqlite3.h>
 #include <openssl/sha.h>
 #include <boost/uuid/random_generator.hpp>
+#include <openssl/rand.h>
 #include <spdlog/spdlog.h>
 #include "Database.hpp"
 #include "npchat_stub/npchat.hpp"
@@ -57,12 +58,23 @@ private:
   std::unordered_map<std::string, std::uint32_t> active_sessions_;
 
   static std::string generateSessionId() {
-    boost::uuids::random_generator generator;
-    auto uid = generator();
-    std::stringstream ss;
-    for (size_t i = 0; i < 16; ++i) {
-      ss << std::hex << std::setfill('0') << std::setw(2) << (int)uid.data[i];
+    // Use cryptographically secure random bytes (32 bytes = 256 bits)
+    // This provides much stronger security than UUIDs for session tokens
+    constexpr size_t session_id_bytes = 32;
+    unsigned char random_bytes[session_id_bytes];
+    
+    // Generate cryptographically secure random bytes using OpenSSL
+    if (RAND_bytes(random_bytes, session_id_bytes) != 1) {
+      spdlog::error("Failed to generate secure random bytes for session ID");
+      throw std::runtime_error("Failed to generate secure session ID");
     }
+    
+    // Convert to hex string (64 characters)
+    std::stringstream ss;
+    for (size_t i = 0; i < session_id_bytes; ++i) {
+      ss << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(random_bytes[i]);
+    }
+    
     return ss.str();
   }
 
@@ -89,6 +101,7 @@ private:
 
 public:
   explicit AuthService(const std::shared_ptr<Database>& database) : db_(database) {
+    spdlog::info("Initializing AuthService");
     // Prepare all statements
     insert_user_stmt_ = db_->prepareStatement(
       "INSERT INTO users (username, email, password_hash, created_at, is_active) VALUES (?, ?, ?, ?, 1)");
@@ -185,7 +198,7 @@ public:
         npchat::UserData user_data;
         user_data.name = username;
         user_data.sessionId = session_id;
-        // user_data.db will be set by the caller
+        // user_data.registeredUser will be set by the caller
         return user_data;
       }
     }

@@ -27,6 +27,8 @@
     "hash_map": "cpp",
     "hash_set": "cpp",
     "initializer_list": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "bitset": "cpp",
+    "algorithm": "cpp"
   }
 }

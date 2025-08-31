@@ -12,8 +12,8 @@
 		authState = state;
 	});
 
-	// Try auto-login on app start
-	authService.tryAutoLogin();
+	// Initialize auth service and try auto-login on app start
+	authService.initialize();
 </script>
 
 <svelte:head>
@@ -33,7 +33,7 @@
 		<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
 			<div class="sm:mx-auto sm:w-full sm:max-w-md">
 				<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-					Welcome, {authState.user?.name}!
+					Welcome, {authState.userData?.name}!
 				</h1>
 				<p class="mt-2 text-center text-sm text-gray-600">
 					NPChat WebRTC Application

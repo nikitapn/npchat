@@ -119,6 +119,26 @@ npchat::ChatId RegisteredUserImpl::CreateChat() {
   }
 }
 
+npchat::ChatId RegisteredUserImpl::CreateChatWith(npchat::UserId otherUserId) {
+  spdlog::info("CreateChatWith called for user ID: {} with user: {}", userId_, otherUserId);
+  
+  try {
+    // Find existing chat or create a new one
+    auto chatId = chatService_->findOrCreateChatBetween(userId_, otherUserId);
+    
+    // Get the participants to register with observer system
+    auto participants = chatService_->getChatParticipants(chatId);
+    chatObservers_->add_chat_participants(chatId, participants);
+    
+    spdlog::info("Found/created chat {} between user {} and user {}, registered with observers", 
+                 chatId, userId_, otherUserId);
+    return chatId;
+  } catch (const std::exception& e) {
+    spdlog::error("Error creating chat between user {} and user {}: {}", userId_, otherUserId, e.what());
+    throw;
+  }
+}
+
 void RegisteredUserImpl::AddChatParticipant(npchat::ChatId chatId, npchat::UserId participantUserId) {
   spdlog::info("AddChatParticipant called for user ID: {}, chat: {}, participant: {}", 
                userId_, chatId, participantUserId);
@@ -183,7 +203,7 @@ npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
     auto messageId = chatService_->sendMessage(userId_, chatId, chatMessage);
     
     // Notify all chat participants about the new message
-    chatObservers_->notify_message_received(messageId, chatMessage);
+    chatObservers_->notify_message_received(messageId, chatMessage, userId_);
     
     // Notify sender about successful delivery
     chatObservers_->notify_message_delivered(chatId, messageId, userId_);

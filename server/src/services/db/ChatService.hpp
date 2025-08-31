@@ -25,6 +25,7 @@ private:
   sqlite3_stmt* get_user_chats_stmt_;
   sqlite3_stmt* insert_attachment_stmt_;
   sqlite3_stmt* get_attachment_stmt_;
+  sqlite3_stmt* find_existing_chat_stmt_;
 
   std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> chat_participants_cache_;
 
@@ -72,6 +73,14 @@ public:
     
     get_attachment_stmt_ = db_->prepareStatement(
       "SELECT type, name, data FROM attachments WHERE id = ?");
+    
+    find_existing_chat_stmt_ = db_->prepareStatement(
+      "SELECT c.id FROM chats c "
+      "JOIN chat_participants cp1 ON c.id = cp1.chat_id "
+      "JOIN chat_participants cp2 ON c.id = cp2.chat_id "
+      "WHERE cp1.user_id = ? AND cp2.user_id = ? AND cp1.user_id != cp2.user_id "
+      "AND (SELECT COUNT(*) FROM chat_participants cp WHERE cp.chat_id = c.id) = 2 "
+      "LIMIT 1");
   }
 
   ~ChatService() {
@@ -85,6 +94,7 @@ public:
     sqlite3_finalize(get_user_chats_stmt_);
     sqlite3_finalize(insert_attachment_stmt_);
     sqlite3_finalize(get_attachment_stmt_);
+    sqlite3_finalize(find_existing_chat_stmt_);
   }
 
   std::uint32_t createChat(std::uint32_t creator_id, const std::vector<std::uint32_t>& participant_ids) {
@@ -308,5 +318,26 @@ public:
     
     sqlite3_reset(get_user_chats_stmt_);
     return chats;
+  }
+
+  // Find existing chat between two users, or create a new one
+  npchat::ChatId findOrCreateChatBetween(std::uint32_t user1_id, std::uint32_t user2_id) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    // First, try to find existing chat between these two users
+    sqlite3_bind_int(find_existing_chat_stmt_, 1, user1_id);
+    sqlite3_bind_int(find_existing_chat_stmt_, 2, user2_id);
+    
+    if (sqlite3_step(find_existing_chat_stmt_) == SQLITE_ROW) {
+      npchat::ChatId existing_chat_id = sqlite3_column_int(find_existing_chat_stmt_, 0);
+      sqlite3_reset(find_existing_chat_stmt_);
+      return existing_chat_id;
+    }
+    
+    sqlite3_reset(find_existing_chat_stmt_);
+    
+    // No existing chat found, create a new one
+    std::vector<std::uint32_t> participants = {user2_id};
+    return createChat(user1_id, participants);
   }
 };

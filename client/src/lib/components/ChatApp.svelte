@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { RegisteredUser, ChatId, Contact } from '../rpc/npchat';
 	import { authService } from '../rpc/services/auth';
+	import { chatService } from '../rpc/services/Chat.svelte';
 	import ContactList from './ContactList.svelte';
 	import ChatList from './ChatList.svelte';
 	import ChatRoom from './ChatRoom.svelte';
@@ -21,6 +22,8 @@
 	function selectChat(chatId: ChatId) {
 		currentChatId = chatId;
 		selectedView = 'chats';
+		// Notify global chat service about active chat
+		chatService.setActiveChatId(chatId);
 	}
 
 	// Handle creating new chat
@@ -34,16 +37,13 @@
 		if (!registeredUser) return;
 
 		try {
-			// Create a new chat
-			const newChatId = await registeredUser.CreateChat();
+			// Create or find existing chat with this contact
+			const chatId = await registeredUser.CreateChatWith(contact.id);
 			
-			// Add the contact as participant
-			await registeredUser.AddChatParticipant(newChatId, contact.id);
+			console.log(`Created/found chat ${chatId} with ${contact.username}`);
 			
-			console.log(`Created chat ${newChatId} with ${contact.username}`);
-			
-			// Switch to the new chat
-			selectChat(newChatId);
+			// Switch to the chat
+			selectChat(chatId);
 		} catch (error) {
 			console.error('Failed to create chat with contact:', error);
 		}
@@ -84,7 +84,14 @@
 									: 'text-gray-700 hover:bg-gray-100'
 							}"
 						>
-							💬 Chats
+							<div class="flex items-center justify-center space-x-1">
+								<span>💬 Chats</span>
+								{#if chatService.getTotalUnreadCount() > 0}
+									<span class="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
+										{chatService.getTotalUnreadCount() > 99 ? '99+' : chatService.getTotalUnreadCount()}
+									</span>
+								{/if}
+							</div>
 						</button>
 						<button
 							onclick={() => selectedView = 'contacts'}

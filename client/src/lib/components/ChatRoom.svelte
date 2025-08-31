@@ -1,9 +1,7 @@
 <script lang="ts">
-	import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList } from '../rpc/npchat';
-	import { _IChatListener_Servant } from '../rpc/npchat';
+	import type { ChatId, MessageId } from '../rpc/npchat';
 	import { authService } from '../rpc/services/auth';
-	import { poa } from '../rpc/index';
-	import * as NPRPC from 'nprpc';
+	import { chatService } from '../rpc/services/Chat.svelte';
 
 	interface ChatRoomProps {
 		currentChatId: ChatId;
@@ -20,80 +18,30 @@
 
 	let messages: Message[] = $state([]);
 	let newMessage = $state('');
-	let registeredUser: RegisteredUser | null = null;
-	let chatListener: ChatListenerImpl | null = null;
 
-	// Implement ChatListener to receive real-time notifications
-	class ChatListenerImpl extends _IChatListener_Servant {
-		OnMessageReceived(messageId: MessageId, message: ChatMessage): void {
-			console.log('Real-time message received:', messageId, message);
-			
-			// Only add message if it's for our current chat
-			if (message.chatId === currentChatId) {
-				const newMsg: Message = {
-					id: messageId,
-					text: message.str,
-					timestamp: new Date(message.timestamp),
-					sender: 'Other User' // We'll improve this later with actual user names
-				};
-				
-				// Check if message already exists (avoid duplicates)
-				if (!messages.find(m => m.id === messageId)) {
-					messages.push(newMsg);
-					messages = [...messages]; // Trigger reactivity
-				}
-			}
-		}
-
-		OnMessageDelivered(chatId: ChatId, messageId: MessageId): void {
-			console.log('Message delivered confirmation:', chatId, messageId);
-			// Could update message status to "delivered" here
-		}
-
-		OnContactListUpdated(contacts: ContactList): void {
-			console.log('Contact list updated:', contacts);
-			// Could update contact list UI here
-		}
+	// Convert chat notifications to UI messages
+	function updateMessages() {
+		const notifications = chatService.getMessagesForChat(currentChatId);
+		messages = notifications.map(notification => ({
+			id: notification.messageId,
+			text: notification.message.str,
+			timestamp: notification.timestamp,
+			sender: 'Other User' // TODO: Get actual sender name from user ID
+		}));
 	}
 
-	// Initialize RegisteredUser connection and ChatListener
-	async function initializeChat() {
-		try {
-			const user = authService.authState.user;
-			if (!user) {
-				console.error('No user database object ID available');
-				return;
-			}
-
-			// Get RegisteredUser proxy
-			registeredUser = user;
-			
-			// Create and register ChatListener for real-time notifications
-			chatListener = new ChatListenerImpl();
-			const listenerObjectId = poa.activate_object(chatListener);
-			
-			// Subscribe to events to receive real-time chat notifications
-			await registeredUser.SubscribeToEvents(listenerObjectId);
-			
-			console.log('Chat initialized with RegisteredUser and ChatListener subscribed');
-		} catch (error) {
-			console.error('Failed to initialize chat:', error);
-		}
+	// Set this chat as active and load messages
+	function activateChat() {
+		chatService.setActiveChatId(currentChatId);
+		updateMessages();
 	}
 
 	// Send a message
 	async function sendMessage() {
-		if (!newMessage.trim() || !registeredUser) return;
+		if (!newMessage.trim()) return;
 
 		try {
-			const chatMessage: ChatMessage = {
-				chatId: currentChatId,
-				timestamp: Date.now(),
-				str: newMessage.trim(),
-				attachment: undefined
-			};
-
-			const messageId = await registeredUser.SendMessage(currentChatId, chatMessage);
+			const messageId = await chatService.sendMessage(currentChatId, newMessage.trim());
 			
 			// Add message to local list immediately for immediate feedback
 			const localMessage: Message = {
@@ -136,24 +84,34 @@
 		}
 	}
 
-	// Cleanup function to remove listener
-	function cleanup() {
-		if (chatListener) {
-			try {
-        poa.deactivate_object(chatListener.oid);
-				console.log('ChatListener unregistered');
-			} catch (error) {
-				console.error('Error removing ChatListener:', error);
+	// Initialize chat when component mounts
+	activateChat();
+
+	// Subscribe to new messages for this chat
+	const unsubscribe = chatService.onNewMessage((notification) => {
+		if (notification.chatId === currentChatId) {
+			// Add new message to the list
+			const newMsg: Message = {
+				id: notification.messageId,
+				text: notification.message.str,
+				timestamp: notification.timestamp,
+				sender: 'Other User' // TODO: Get actual sender name
+			};
+			
+			// Check if message already exists (avoid duplicates)
+			if (!messages.find(m => m.id === notification.messageId)) {
+				messages.push(newMsg);
+				messages = [...messages]; // Trigger reactivity
 			}
 		}
-	}
-
-	// Initialize chat when component mounts
-	initializeChat();
+	});
 
 	// Cleanup when component is destroyed
 	$effect(() => {
-		return cleanup;
+		return () => {
+			unsubscribe();
+			// Don't set activeChatId to null here - let the parent component handle it
+		};
 	});
 </script>
 

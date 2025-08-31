@@ -96,6 +96,7 @@ interface RegisteredUser {
   // Chat management  
   ChatList GetChats();
   ChatId CreateChat();
+  ChatId CreateChatWith(userId: in UserId);
   void AddChatParticipant(chatId: in ChatId, userId: in UserId);
   void LeaveChatParticipant(chatId: in ChatId, userId: in UserId);
   

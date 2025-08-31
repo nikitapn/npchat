@@ -3,6 +3,7 @@ import { Authorizator, AuthorizationFailed, RegistrationFailed, AuthorizationErr
 import type { UserData } from '../npchat';
 import { RegisteredUser } from '../npchat';
 import { authorizator } from '../index';
+import { sessionManager, SecurityUtils } from './session';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -20,9 +21,28 @@ export class AuthService {
   };
 
   private listeners: Set<(state: AuthState) => void> = new Set();
+  private initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    this.loadSessionFromStorage();
+    // Don't auto-login in constructor - wait for explicit initialization
+    this.loadSessionDataOnly();
+  }
+
+  // Load session data without attempting RPC calls
+  private loadSessionDataOnly() {
+    try {
+      if (sessionManager.isSessionValid()) {
+        const sessionId = sessionManager.getSessionFromSecureCookie();
+        if (sessionId && SecurityUtils.isValidSessionId(sessionId)) {
+          this.updateAuthState({
+            sessionId: sessionId
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load session data:', error);
+      this.clearSessionFromCookies();
+    }
   }
 
   // Subscribe to auth state changes
@@ -47,43 +67,67 @@ export class AuthService {
     this.notifyListeners();
   }
 
-  private saveSessionToStorage() {
-    if (this._authState.sessionId && this._authState.user) {
-      localStorage.setItem('npchat_session', JSON.stringify({
-        sessionId: this._authState.sessionId,
-        user: this._authState.user
-      }));
+  // Check if RPC is available
+  private isRPCAvailable(): boolean {
+    return authorizator !== null && authorizator !== undefined;
+  }
+
+  // Wait for RPC to be available with timeout
+  private async waitForRPC(timeoutMs: number = 5000): Promise<boolean> {
+    const startTime = Date.now();
+    
+    while (!this.isRPCAvailable() && (Date.now() - startTime) < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+    }
+    
+    return this.isRPCAvailable();
+  }
+
+  // Enhanced cookie utility functions using secure session manager
+  private saveSessionToCookies() {
+    if (this._authState.sessionId && this._authState.userData) {
+      sessionManager.setSecureSession(this._authState.sessionId, this._authState.userData);
     }
   }
 
-  private loadSessionFromStorage() {
+  private loadSessionFromCookies() {
     try {
-      const stored = localStorage.getItem('npchat_session');
-      if (stored) {
-        const data = JSON.parse(stored);
-        this.updateAuthState({
-          isAuthenticated: true,
-          user: data.user,
-          sessionId: data.sessionId
-        });
+      if (sessionManager.isSessionValid()) {
+        const sessionId = sessionManager.getSessionFromSecureCookie();
+        if (sessionId && SecurityUtils.isValidSessionId(sessionId)) {
+          this.updateAuthState({
+            sessionId: sessionId
+          });
+        }
       }
     } catch (error) {
-      console.warn('Failed to load session from storage:', error);
-      localStorage.removeItem('npchat_session');
+      console.warn('Failed to load secure session:', error);
+      this.clearSessionFromCookies();
     }
   }
 
-  private clearSessionFromStorage() {
-    localStorage.removeItem('npchat_session');
+  private clearSessionFromCookies() {
+    sessionManager.clearSecureSession();
   }
 
   async login(login: string, password: string): Promise<UserData> {
-    if (!authorizator) {
-      throw new Error('Authentication service not available - RPC not initialized');
+    // Wait for RPC to be available
+    if (!this.isRPCAvailable()) {
+      const rpcReady = await this.waitForRPC();
+      if (!rpcReady) {
+        throw new Error('Authentication service not available - RPC connection timeout');
+      }
+    }
+
+    // Sanitize inputs for security
+    const sanitizedLogin = SecurityUtils.sanitizeInput(login);
+    
+    if (!sanitizedLogin || !password) {
+      throw new Error('Login and password are required');
     }
 
     try {
-      const userData = await authorizator.LogIn(login, password);
+      const userData = await authorizator.LogIn(sanitizedLogin, password);
       console.log({userData});
       const userProxy = NPRPC.narrow(userData.registeredUser, RegisteredUser);
 
@@ -94,7 +138,7 @@ export class AuthService {
         sessionId: userData.sessionId
       });
 
-      this.saveSessionToStorage();
+      this.saveSessionToCookies();
       return userData;
     } catch (error) {
       if (error instanceof AuthorizationFailed) {
@@ -112,8 +156,12 @@ export class AuthService {
   }
 
   async loginWithSession(sessionId: string): Promise<UserData> {
-    if (!authorizator) {
-      throw new Error('Authentication service not available - RPC not initialized');
+    // Wait for RPC to be available
+    if (!this.isRPCAvailable()) {
+      const rpcReady = await this.waitForRPC();
+      if (!rpcReady) {
+        throw new Error('Authentication service not available - RPC connection timeout');
+      }
     }
 
     try {
@@ -127,11 +175,11 @@ export class AuthService {
         sessionId: userData.sessionId
       });
 
-      this.saveSessionToStorage();
+      this.saveSessionToCookies();
       return userData;
     } catch (error) {
       // Clear invalid session
-      this.clearSessionFromStorage();
+      this.clearSessionFromCookies();
       this.updateAuthState({
         isAuthenticated: false,
         user: null,
@@ -146,37 +194,39 @@ export class AuthService {
   }
 
   async logout(): Promise<boolean> {
-    if (!authorizator || !this._authState.sessionId) {
+    if (this.isRPCAvailable() && this._authState.sessionId) {
+      try {
+        const success = await authorizator.LogOut(this._authState.sessionId);
+        
+        this.updateAuthState({
+          isAuthenticated: false,
+          user: null,
+          sessionId: null
+        });
+        
+        this.clearSessionFromCookies();
+        return success;
+      } catch (error) {
+        console.error('Logout error:', error);
+        // Even if logout fails on server, clear local state
+        this.updateAuthState({
+          isAuthenticated: false,
+          user: null,
+          sessionId: null
+        });
+        this.clearSessionFromCookies();
+        return false;
+      }
+    } else {
+      // Clear local state even if RPC is not available
       this.updateAuthState({
         isAuthenticated: false,
         user: null,
         sessionId: null
       });
-      this.clearSessionFromStorage();
+      
+      this.clearSessionFromCookies();
       return true;
-    }
-
-    try {
-      const success = await authorizator.LogOut(this._authState.sessionId);
-      
-      this.updateAuthState({
-        isAuthenticated: false,
-        user: null,
-        sessionId: null
-      });
-      
-      this.clearSessionFromStorage();
-      return success;
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Even if logout fails on server, clear local state
-      this.updateAuthState({
-        isAuthenticated: false,
-        user: null,
-        sessionId: null
-      });
-      this.clearSessionFromStorage();
-      return false;
     }
   }
 
@@ -201,9 +251,23 @@ export class AuthService {
       throw new Error('Authentication service not available - RPC not initialized');
     }
 
+    // Sanitize and validate inputs
+    const sanitizedUsername = SecurityUtils.sanitizeInput(username);
+    const sanitizedEmail = SecurityUtils.sanitizeInput(email);
+    
+    if (!sanitizedUsername || !sanitizedEmail || !password) {
+      throw new Error('Username, email, and password are required');
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      throw new Error('Invalid email format');
+    }
+
     try {
-      console.log('Registering user:', username, email);
-      await authorizator.RegisterStepOne(username, email, password);
+      console.log('Registering user:', sanitizedUsername, sanitizedEmail);
+      await authorizator.RegisterStepOne(sanitizedUsername, sanitizedEmail, password);
     } catch (error) {
       if (error instanceof RegistrationFailed) {
         switch (error.reason) {
@@ -226,8 +290,15 @@ export class AuthService {
       throw new Error('Authentication service not available - RPC not initialized');
     }
 
+    // Sanitize and validate inputs
+    const sanitizedUsername = SecurityUtils.sanitizeInput(username);
+    
+    if (!sanitizedUsername || !code || code < 0 || code > 999999) {
+      throw new Error('Valid username and verification code are required');
+    }
+
     try {
-      await authorizator.RegisterStepTwo(username, code);
+      await authorizator.RegisterStepTwo(sanitizedUsername, code);
     } catch (error) {
       if (error instanceof RegistrationFailed) {
         switch (error.reason) {
@@ -253,6 +324,37 @@ export class AuthService {
       }
     }
     return this._authState.isAuthenticated;
+  }
+
+  // Initialize auth service and attempt auto-login
+  async initialize(): Promise<boolean> {
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return this._authState.isAuthenticated;
+    }
+
+    this.initializationPromise = this._initialize();
+    await this.initializationPromise;
+    return this._authState.isAuthenticated;
+  }
+
+  private async _initialize(): Promise<void> {
+    try {
+      // Wait for RPC to be available
+      const rpcReady = await this.waitForRPC(10000); // 10 second timeout
+      if (!rpcReady) {
+        console.warn('RPC connection not available for auto-login');
+        return;
+      }
+      // Try to load session from cookies
+      this.loadSessionFromCookies();
+      // Attempt auto-login if we have a session
+      if (this._authState.sessionId && !this._authState.isAuthenticated) {
+        await this.tryAutoLogin();
+      }
+    } catch (error) {
+      console.error('Auth service initialization failed:', error);
+    }
   }
 }
 
