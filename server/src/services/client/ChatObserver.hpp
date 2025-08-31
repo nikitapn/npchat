@@ -12,12 +12,8 @@ private:
   
   // Map chat ID to participating user IDs
   std::unordered_map<npchat::ChatId, std::unordered_set<std::uint32_t>> chat_participants_;
-  
-  mutable std::mutex mutex_;
 
   void on_message_received_impl(npchat::MessageId messageId, npchat::ChatMessage message, npchat::ChatId chatId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
     // Find all participants of this chat
     auto chat_it = chat_participants_.find(chatId);
     if (chat_it == chat_participants_.end()) {
@@ -42,8 +38,6 @@ private:
   }
   
   void on_message_delivered_impl(npchat::ChatId chatId, npchat::MessageId messageId, std::uint32_t senderId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
     // Notify only the sender about delivery confirmation
     auto user_it = user_listeners_.find(senderId);
     if (user_it != user_listeners_.end()) {
@@ -58,8 +52,6 @@ private:
   }
   
   void on_contact_list_updated_impl(std::uint32_t userId, npchat::ContactList contacts) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
     auto user_it = user_listeners_.find(userId);
     if (user_it != user_listeners_.end()) {
       for (auto* listener : user_it->second) {
@@ -78,7 +70,6 @@ public:
   // Subscribe a user's listener to chat events
   void subscribe_user(std::uint32_t userId, npchat::ChatListener* listener) {
     nplib::async<false>(executor(), [this, userId, listener] {
-      std::lock_guard<std::mutex> lock(mutex_);
       user_listeners_[userId].push_back(listener);
       add_impl(listener); // Add to base observer list
     });
@@ -87,7 +78,6 @@ public:
   // Unsubscribe a user's listener
   void unsubscribe_user(std::uint32_t userId, npchat::ChatListener* listener) {
     nplib::async<false>(executor(), [this, userId, listener] {
-      std::lock_guard<std::mutex> lock(mutex_);
       auto user_it = user_listeners_.find(userId);
       if (user_it != user_listeners_.end()) {
         auto& listeners = user_it->second;
@@ -102,7 +92,6 @@ public:
   // Add chat participants mapping
   void add_chat_participants(npchat::ChatId chatId, const std::vector<std::uint32_t>& participants) {
     nplib::async<false>(executor(), [this, chatId, participants] {
-      std::lock_guard<std::mutex> lock(mutex_);
       auto& chat_users = chat_participants_[chatId];
       for (auto userId : participants) {
         chat_users.insert(userId);
@@ -113,7 +102,6 @@ public:
   // Remove user from chat
   void remove_chat_participant(npchat::ChatId chatId, std::uint32_t userId) {
     nplib::async<false>(executor(), [this, chatId, userId] {
-      std::lock_guard<std::mutex> lock(mutex_);
       auto chat_it = chat_participants_.find(chatId);
       if (chat_it != chat_participants_.end()) {
         chat_it->second.erase(userId);

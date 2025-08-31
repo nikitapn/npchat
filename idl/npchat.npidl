@@ -29,7 +29,7 @@ RegistrationFailed: exception {
 UserData: flat {
   name: string;
   sessionId: string;
-  db: object; // RegisteredUser
+  registeredUser: object; // RegisteredUser
 }
 
 enum ChatAttachmentType {

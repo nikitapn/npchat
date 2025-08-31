@@ -54,18 +54,18 @@
 	// Initialize RegisteredUser connection and ChatListener
 	async function initializeChat() {
 		try {
-			const userData = authService.authState.user;
-			if (!userData?.db) {
+			const user = authService.authState.user;
+			if (!user) {
 				console.error('No user database object ID available');
 				return;
 			}
 
 			// Get RegisteredUser proxy
-			registeredUser = poa.get_object(userData.db) as RegisteredUser;
+			registeredUser = user;
 			
 			// Create and register ChatListener for real-time notifications
 			chatListener = new ChatListenerImpl();
-			const listenerObjectId = poa.add_object(chatListener);
+			const listenerObjectId = poa.activate_object(chatListener);
 			
 			// Subscribe to events to receive real-time chat notifications
 			await registeredUser.SubscribeToEvents(listenerObjectId);
@@ -95,7 +95,7 @@
 				id: messageId,
 				text: newMessage.trim(),
 				timestamp: new Date(),
-				sender: authService.authState.user?.name || 'You'
+				sender: authService.authState.userData?.name || 'You'
 			};
 			messages.push(localMessage);
 			messages = [...messages]; // Trigger reactivity
@@ -119,7 +119,7 @@
 	function cleanup() {
 		if (chatListener) {
 			try {
-				poa.remove_object(chatListener);
+        poa.deactivate_object(chatListener.oid);
 				console.log('ChatListener unregistered');
 			} catch (error) {
 				console.error('Error removing ChatListener:', error);
@@ -142,7 +142,7 @@
 		<div class="max-w-4xl mx-auto flex justify-between items-center">
 			<h1 class="text-xl font-semibold text-gray-900">Chat Room #{chatId}</h1>
 			<div class="text-sm text-gray-500">
-				{authService.authState.user?.name}
+				{authService.authState.userData?.name}
 			</div>
 		</div>
 	</div>

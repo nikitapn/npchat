@@ -14,6 +14,8 @@ add_custom_command(
 add_custom_command(
   OUTPUT npchat_js.stamp
   COMMAND  npm ci && npm run build
+  # Wierd bug with typescript server shows everything with errors after rebuild, so just touch tsconfig to force reload
+  COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_SOURCE_DIR}/tsconfig.app.json
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${SOCIAL_DST}
   COMMENT "Building NPChat TypeScript client"

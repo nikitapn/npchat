@@ -42,8 +42,8 @@ npchat::UserData AuthorizatorImpl::LogIn (::nprpc::flat::Span<char> login, ::npr
     &nprpc::get_context()
   );
   
-  // Set the db field to the activated object
-  userData.db = oid;
+  // Set the registeredUser field to the activated object
+  userData.registeredUser = oid;
   
   return userData;
 }
@@ -64,8 +64,8 @@ npchat::UserData AuthorizatorImpl::LogInWithSessionId (::nprpc::flat::Span<char>
     &nprpc::get_context()
   );
   
-  // Set the db field to the activated object
-  userData.db = oid;
+  // Set the registeredUser field to the activated object
+  userData.registeredUser = oid;
   
   return userData;
 }

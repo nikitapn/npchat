@@ -1,17 +1,20 @@
 import * as NPRPC from 'nprpc';
 import { Authorizator, AuthorizationFailed, RegistrationFailed, AuthorizationError, RegistrationError } from '../npchat';
 import type { UserData } from '../npchat';
+import { RegisteredUser } from '../npchat';
 import { authorizator } from '../index';
 
 export interface AuthState {
   isAuthenticated: boolean;
-  user: UserData | null;
+  userData: UserData | null;
+  user: RegisteredUser | null;
   sessionId: string | null;
 }
 
 export class AuthService {
   private _authState: AuthState = {
     isAuthenticated: false,
+    userData: null,
     user: null,
     sessionId: null
   };
@@ -81,10 +84,13 @@ export class AuthService {
 
     try {
       const userData = await authorizator.LogIn(login, password);
-      
+      console.log({userData});
+      const userProxy = NPRPC.narrow(userData.registeredUser, RegisteredUser);
+
       this.updateAuthState({
         isAuthenticated: true,
-        user: userData,
+        userData: userData,
+        user: userProxy,
         sessionId: userData.sessionId
       });
 
@@ -112,10 +118,12 @@ export class AuthService {
 
     try {
       const userData = await authorizator.LogInWithSessionId(sessionId);
-      
+      const userProxy = NPRPC.narrow(userData.registeredUser, RegisteredUser);
+
       this.updateAuthState({
         isAuthenticated: true,
-        user: userData,
+        userData: userData,
+        user: userProxy,
         sessionId: userData.sessionId
       });
 
