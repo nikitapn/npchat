@@ -1,17 +1,66 @@
 <script lang="ts">
 	import type { RegisteredUser, Chat, ChatList, ChatId } from '../rpc/npchat';
 	import { chatService } from '../rpc/services/Chat.svelte';
+	import { authService } from '../rpc/services/auth';
+	import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
 
 	interface ChatListProps {
 		registeredUser: RegisteredUser | null;
 		currentChatId: ChatId | null;
-		onSelectChat: (chatId: ChatId) => void;
+		onSelectChat: (chatId: ChatId | null) => void;
 		onCreateNewChat: () => void;
 	}
 
 	let { registeredUser, currentChatId, onSelectChat, onCreateNewChat }: ChatListProps = $props();
 
 	let chats: Chat[] = $state([]);
+	let contextMenu = $state({
+		visible: false,
+		x: 0,
+		y: 0,
+		chatId: null as ChatId | null
+	});
+
+	// Get context menu items for a chat
+	function getContextMenuItems(chat: Chat): ContextMenuItem[] {
+		return [
+			{
+				label: 'Open Chat',
+				icon: 'open',
+				action: () => {
+					onSelectChat(chat.id);
+					hideContextMenu();
+				}
+			},
+			{
+				separator: true,
+				label: '',
+				action: () => {}
+			},
+			{
+				label: 'Leave Chat',
+				icon: 'leave',
+				action: () => leaveChat(chat.id)
+			},
+			...(chat.participantCount === 1 ? [{
+				label: 'Delete Chat',
+				icon: 'delete',
+				className: 'text-red-600 hover:bg-red-50',
+				action: () => deleteChat(chat.id)
+			}] : []),
+			{
+				separator: true,
+				label: '',
+				action: () => {}
+			},
+			{
+				label: 'Cancel',
+				icon: 'cancel',
+				className: 'text-gray-500 hover:bg-gray-100',
+				action: () => hideContextMenu()
+			}
+		];
+	}
 
 	// Load user's chats
 	async function loadChats() {
@@ -69,6 +118,83 @@
 		onCreateNewChat();
 		createNewChat();
 	}
+
+	// Context menu handlers
+	function handleRightClick(event: MouseEvent, chatId: ChatId) {
+		event.preventDefault();
+		contextMenu.visible = true;
+		contextMenu.x = event.clientX;
+		contextMenu.y = event.clientY;
+		contextMenu.chatId = chatId;
+	}
+
+	function hideContextMenu() {
+		contextMenu.visible = false;
+		contextMenu.chatId = null;
+	}
+
+	// Chat actions
+	async function deleteChat(chatId: ChatId) {
+		if (!registeredUser) {
+			console.error('No registered user available');
+			return;
+		}
+
+		const confirmMessage = `Are you sure you want to delete Chat #${chatId}? This action cannot be undone.`;
+		if (!confirm(confirmMessage)) {
+			return;
+		}
+
+		try {
+			const currentUserId = authService.getCurrentUserId();
+			
+			await registeredUser.DeleteChat(chatId, currentUserId);
+			console.log('Deleted chat:', chatId);
+			
+			// Refresh chat list
+			await loadChats();
+			
+			// If this was the current chat, clear selection
+			if (currentChatId === chatId) {
+				onSelectChat(null);
+			}
+		} catch (error) {
+			console.error('Failed to delete chat:', error);
+			alert('Failed to delete chat. Please try again.');
+		} finally {
+			hideContextMenu();
+		}
+	}
+
+	async function leaveChat(chatId: ChatId) {
+		if (!registeredUser || !chatId) return;
+
+		const confirmed = confirm('Are you sure you want to leave this chat?');
+		if (!confirmed) {
+			hideContextMenu();
+			return;
+		}
+
+		try {
+			const currentUserId = authService.getCurrentUserId();
+			
+			await registeredUser.LeaveChatParticipant(chatId, currentUserId);
+			console.log('Left chat:', chatId);
+			
+			// Refresh chat list
+			await loadChats();
+			
+			// If this was the current chat, clear selection
+			if (currentChatId === chatId) {
+				onSelectChat(null);
+			}
+		} catch (error) {
+			console.error('Failed to leave chat:', error);
+			alert('Failed to leave chat. Please try again.');
+		} finally {
+			hideContextMenu();
+		}
+	}
 </script>
 
 <div class="bg-white rounded-lg shadow p-4">
@@ -86,12 +212,14 @@
 		{#each chats as chat}
 			{@const unreadCount = chatService.getUnreadCount(chat.id)}
 			<button 
-				class="w-full flex justify-between items-center p-3 rounded-lg transition-colors {
+				class="w-full flex justify-between items-center p-3 rounded-lg transition-colors select-none {
 					currentChatId === chat.id 
 						? 'bg-blue-100 border border-blue-300' 
 						: 'bg-gray-50 hover:bg-gray-100'
 				}"
 				onclick={() => onSelectChat(chat.id)}
+				oncontextmenu={(e) => handleRightClick(e, chat.id)}
+				title="Left click to open, right click for options"
 			>
 				<div class="flex items-center space-x-3">
 					<div class="relative">
@@ -134,3 +262,18 @@
 		{/each}
 	</div>
 </div>
+
+<!-- Context Menu using reusable component -->
+{#if contextMenu.visible && contextMenu.chatId !== null}
+	{@const selectedChat = chats.find(c => c.id === contextMenu.chatId)}
+	{#if selectedChat}
+		<ContextMenu
+			visible={contextMenu.visible}
+			x={contextMenu.x}
+			y={contextMenu.y}
+			items={getContextMenuItems(selectedChat)}
+			title="Chat #{selectedChat.id}"
+			onClose={hideContextMenu}
+		/>
+	{/if}
+{/if}

@@ -356,6 +356,19 @@ export class AuthService {
       console.error('Auth service initialization failed:', error);
     }
   }
+
+  // Method to get current user ID
+  // TODO: Implement proper user ID retrieval from session or server
+  // Currently returns a hardcoded value until we store user ID during authentication
+  getCurrentUserId(): number {
+    if (!this._authState.isAuthenticated) {
+      throw new Error('User is not authenticated');
+    }
+    
+    // For now, return a hardcoded user ID until we implement proper user ID storage
+    // In a real app, this would be stored during login or retrieved from the server
+    return 1;
+  }
 }
 
 // Global singleton instance
