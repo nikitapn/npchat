@@ -52,16 +52,41 @@ ChatMessage: flat {
 
 Contact: flat {
   id: UserId;
-  name: string;
+  username: string;
   avatar?: bytestream;
 }
 
+Chat: flat {
+  id: ChatId;
+  createdBy: UserId;
+  createdAt: u32;
+  participantCount: u32;
+  lastMessageTime?: u32;
+}
+
 using ContactList = vector<Contact>;
+using ChatList = vector<Chat>;
+using MessageList = vector<ChatMessage>;
 
 [trusted=false]
 interface RegisteredUser {
+  // Contact management
   ContactList GetContacts();
+  ContactList SearchUsers(query: in string, limit: in u32);
+  void AddContact(userId: in UserId);
+  void RemoveContact(userId: in UserId);
+  
+  // Chat management  
+  ChatList GetChats();
+  ChatId CreateChat();
+  void AddChatParticipant(chatId: in ChatId, userId: in UserId);
+  void LeaveChatParticipant(chatId: in ChatId, userId: in UserId);
+  
+  // Message operations
   MessageId SendMessage(chatId: in ChatId, message: in ChatMessage);
+  MessageList GetChatHistory(chatId: in ChatId, limit: in u32, offset: in u32);
+  u32 GetUnreadMessageCount();
+  void MarkMessageAsRead(messageId: in MessageId);
 }
 
 interface ChatListener {

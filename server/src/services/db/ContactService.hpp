@@ -146,7 +146,7 @@ public:
       npchat::Contact contact;
       contact.id = sqlite3_column_int(get_contacts_stmt_, 0);
       contact.username = reinterpret_cast<const char*>(sqlite3_column_text(get_contacts_stmt_, 1));
-      contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contacts_stmt_, 2));
+      // contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contacts_stmt_, 2));
       
       contacts.push_back(std::move(contact));
     }
@@ -165,7 +165,7 @@ public:
       npchat::Contact contact;
       contact.id = sqlite3_column_int(get_contact_by_id_stmt_, 0);
       contact.username = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_id_stmt_, 1));
-      contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_id_stmt_, 2));
+      // contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_id_stmt_, 2));
       
       sqlite3_reset(get_contact_by_id_stmt_);
       return contact;
@@ -185,7 +185,7 @@ public:
       npchat::Contact contact;
       contact.id = sqlite3_column_int(get_contact_by_username_stmt_, 0);
       contact.username = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_username_stmt_, 1));
-      contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_username_stmt_, 2));
+      // contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_contact_by_username_stmt_, 2));
       
       sqlite3_reset(get_contact_by_username_stmt_);
       return contact;
@@ -242,7 +242,7 @@ public:
       npchat::Contact contact;
       contact.id = sqlite3_column_int(get_blocked_contacts_stmt_, 0);
       contact.username = reinterpret_cast<const char*>(sqlite3_column_text(get_blocked_contacts_stmt_, 1));
-      contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_blocked_contacts_stmt_, 2));
+      // contact.email = reinterpret_cast<const char*>(sqlite3_column_text(get_blocked_contacts_stmt_, 2));
       
       contacts.push_back(std::move(contact));
     }
@@ -282,7 +282,7 @@ public:
       npchat::Contact user;
       user.id = sqlite3_column_int(search_users_stmt_, 0);
       user.username = reinterpret_cast<const char*>(sqlite3_column_text(search_users_stmt_, 1));
-      user.email = reinterpret_cast<const char*>(sqlite3_column_text(search_users_stmt_, 2));
+      // user.email = reinterpret_cast<const char*>(sqlite3_column_text(search_users_stmt_, 2));
       
       users.push_back(std::move(user));
     }

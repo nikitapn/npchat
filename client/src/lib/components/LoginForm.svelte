@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { authService } from '../rpc/services/auth';
+	
 	let email = $state('');
 	let password = $state('');
 	let isLoading = $state(false);
@@ -28,12 +30,14 @@
 		}
 
 		try {
-			// Simulate API call
-			await new Promise(resolve => setTimeout(resolve, 1000));
-			console.log('Login attempt:', { email, password });
-			// Handle successful login here
+			const userData = await authService.login(email, password);
+			console.log('Login successful:', userData);
+			// Redirect to main app or show success message
+			// For now, just reset the form
+			email = '';
+			password = '';
 		} catch (error) {
-			errors.general = 'Login failed. Please try again.';
+			errors.general = error instanceof Error ? error.message : 'Login failed. Please try again.';
 		} finally {
 			isLoading = false;
 		}
@@ -48,9 +52,13 @@
 			</h2>
 			<p class="mt-2 text-center text-sm text-gray-600">
 				Or
-				<a href="/register" class="font-medium text-indigo-600 hover:text-indigo-500">
+				<button 
+					type="button" 
+					onclick={() => window.location.hash = '/register'}
+					class="font-medium text-indigo-600 hover:text-indigo-500"
+				>
 					create a new account
-				</a>
+				</button>
 			</p>
 		</div>
 		
@@ -115,9 +123,13 @@
 				</div>
 
 				<div class="text-sm">
-					<a href="/forgot-password" class="font-medium text-indigo-600 hover:text-indigo-500">
+					<button 
+						type="button" 
+						onclick={() => alert('Password reset functionality coming soon!')}
+						class="font-medium text-indigo-600 hover:text-indigo-500"
+					>
 						Forgot your password?
-					</a>
+					</button>
 				</div>
 			</div>
 

@@ -17,12 +17,16 @@
 #include <boost/program_options.hpp>
 
 #include "services/boost/di.hpp"
+
 #include "services/db/Database.hpp"
 #include "services/db/AuthService.hpp"
+#include "services/db/ContactService.hpp"
+#include "services/db/MessageService.hpp"
+#include "services/db/ChatService.hpp"
+
 #include "services/rpc/Authorizator.hpp"
 
 #include "util/util.hpp"
-
 #include "util/HostJsonMacros.hpp"
 
 DEFINE_HOST_JSON_STRUCT(authorizator)
@@ -72,12 +76,12 @@ int main(int argc, char *argv[]) {
   try {
     auto builder = nprpc::RpcBuilder();
     builder
-      .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
+      .set_debug_level(nprpc::DebugLevel::DebugLevel_TraceAll)
       .set_listen_http_port(port)
       .set_http_root_dir(http_dir)
       .set_hostname(hostname);
 
-    if (public_cert.empty() || private_key.empty())
+    if ((public_cert.empty() ^ private_key.empty()) == true)
       throw std::runtime_error("Certificate and private key paths must be provided when using SSL.");
 
     bool use_ssl = !public_cert.empty();
@@ -97,16 +101,16 @@ int main(int argc, char *argv[]) {
     auto injector = firstInjector();
 
     auto authService = injector.create<std::shared_ptr<AuthService>>();
-    // auto fertilizerService = injector.create<std::shared_ptr<FertilizerService>>();
-    // auto calculationService = injector.create<std::shared_ptr<CalculationService>>();
-    // auto userService = injector.create<std::shared_ptr<UserService>>();
+    auto contactService = injector.create<std::shared_ptr<ContactService>>();
+    auto messageService = injector.create<std::shared_ptr<MessageService>>();
+    auto chatService = injector.create<std::shared_ptr<ChatService>>();
 
     auto injector2 = di::make_injector(
       firstInjector(),
-      di::bind<>().to(authService)
-    //   di::bind<>().to(fertilizerService),
-    //   di::bind<>().to(calculationService),
-    //   di::bind<>().to(userService)
+      di::bind<>().to(authService),
+      di::bind<>().to(contactService),
+      di::bind<>().to(messageService),
+      di::bind<>().to(chatService)
     );
 
     // static poa

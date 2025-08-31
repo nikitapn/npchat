@@ -3,12 +3,24 @@
 #include "npchat_stub/npchat.hpp"
 
 class AuthService;
+class ContactService;
+class MessageService;
+class ChatService;
 
 class AuthorizatorImpl : public npchat::IAuthorizator_Servant {
   nprpc::Rpc& rpc_;
   std::shared_ptr<AuthService> authService_;
+  std::shared_ptr<ContactService> contactService_;
+  std::shared_ptr<MessageService> messageService_;
+  std::shared_ptr<ChatService> chatService_;
+  nprpc::Poa* user_poa_;
+
 public:
-  AuthorizatorImpl(nprpc::Rpc& rpc, std::shared_ptr<AuthService> authService);
+  AuthorizatorImpl(nprpc::Rpc& rpc, 
+                   std::shared_ptr<AuthService> authService,
+                   std::shared_ptr<ContactService> contactService,
+                   std::shared_ptr<MessageService> messageService,
+                   std::shared_ptr<ChatService> chatService);
 
   virtual npchat::UserData LogIn (::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password) override;
   

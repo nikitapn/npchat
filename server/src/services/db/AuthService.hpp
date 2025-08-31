@@ -222,6 +222,44 @@ public:
     throw npchat::AuthorizationFailed{npchat::AuthorizationError::AccessDenied};
   }
 
+  std::uint32_t getUserIdFromSession(std::string_view session_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string session_str(session_id);
+    
+    // Check cache first
+    if (auto it = active_sessions_.find(session_str); it != active_sessions_.end()) {
+      return it->second;
+    }
+    
+    sqlite3_bind_text(get_user_by_session_stmt_, 1, session_id.data(), session_id.size(), SQLITE_STATIC);
+    
+    if (sqlite3_step(get_user_by_session_stmt_) == SQLITE_ROW) {
+      std::uint32_t user_id = sqlite3_column_int(get_user_by_session_stmt_, 0);
+      sqlite3_reset(get_user_by_session_stmt_);
+      return user_id;
+    }
+    
+    sqlite3_reset(get_user_by_session_stmt_);
+    throw npchat::AuthorizationFailed{npchat::AuthorizationError::AccessDenied};
+  }
+
+  std::uint32_t getUserIdFromLogin(std::string_view login) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    sqlite3_bind_text(get_user_by_login_stmt_, 1, login.data(), login.size(), SQLITE_STATIC);
+    sqlite3_bind_text(get_user_by_login_stmt_, 2, login.data(), login.size(), SQLITE_STATIC);
+    
+    if (sqlite3_step(get_user_by_login_stmt_) == SQLITE_ROW) {
+      std::uint32_t user_id = sqlite3_column_int(get_user_by_login_stmt_, 0);
+      sqlite3_reset(get_user_by_login_stmt_);
+      return user_id;
+    }
+    
+    sqlite3_reset(get_user_by_login_stmt_);
+    throw npchat::AuthorizationFailed{npchat::AuthorizationError::InvalidCredentials};
+  }
+
   bool logOut(std::string_view session_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -235,9 +273,8 @@ public:
   }
 
   // Registration methods
-  bool checkUsername(std::string_view username) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
+  // Internal helpers that don't acquire mutex (called when mutex is already held)
+  bool checkUsernameInternal(std::string_view username) {
     sqlite3_bind_text(check_username_stmt_, 1, username.data(), username.size(), SQLITE_STATIC);
     sqlite3_bind_text(check_username_stmt_, 2, username.data(), username.size(), SQLITE_STATIC);
     
@@ -251,10 +288,8 @@ public:
     sqlite3_reset(check_username_stmt_);
     return available;
   }
-
-  bool checkEmail(std::string_view email) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
+  
+  bool checkEmailInternal(std::string_view email) {
     sqlite3_bind_text(check_email_stmt_, 1, email.data(), email.size(), SQLITE_STATIC);
     sqlite3_bind_text(check_email_stmt_, 2, email.data(), email.size(), SQLITE_STATIC);
     
@@ -269,14 +304,24 @@ public:
     return available;
   }
 
+  bool checkUsername(std::string_view username) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return checkUsernameInternal(username);
+  }
+
+  bool checkEmail(std::string_view email) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return checkEmailInternal(email);
+  }
+
   void registerStepOne(std::string_view username, std::string_view email, std::string_view password) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!checkUsername(username)) {
+    if (!checkUsernameInternal(username)) {
       throw npchat::RegistrationFailed{npchat::RegistrationError::UsernameAlreadyTaken};
     }
     
-    if (!checkEmail(email)) {
+    if (!checkEmailInternal(email)) {
       throw npchat::RegistrationFailed{npchat::RegistrationError::EmailAlreadyTaken};
     }
     

@@ -19,6 +19,8 @@ add_executable(npchat
 
   src/services/rpc/Authorizator.hpp
   src/services/rpc/Authorizator.cpp
+  src/services/rpc/RegisteredUser.hpp
+  src/services/rpc/RegisteredUser.cpp
 )
 
 target_link_libraries(npchat PRIVATE

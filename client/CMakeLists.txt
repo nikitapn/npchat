@@ -11,17 +11,17 @@ add_custom_command(
   VERBATIM
 )
 
-add_custom_command(
-  OUTPUT npchat_js.stamp
-  COMMAND  npm ci && npm run build
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  DEPENDS ${SOCIAL_DST}
-  COMMENT "Building NPChat TypeScript client"
-  VERBATIM
-)
+# add_custom_command(
+#   OUTPUT npchat_js.stamp
+#   COMMAND  npm ci && npm run build
+#   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#   DEPENDS ${SOCIAL_DST}
+#   COMMENT "Building NPChat TypeScript client"
+#   VERBATIM
+# )
 
 add_custom_target(npchat_js ALL
   DEPENDS
-    npchat_js.stamp
+    # npchat_js.stamp
     npchat_stub_gen
 )

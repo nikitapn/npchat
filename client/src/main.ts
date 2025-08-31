@@ -2,7 +2,7 @@ import { mount } from 'svelte'
 import './app.css'
 import App from './App.svelte'
 
-import { init_rpc, poa } from './lib/rpc/index'
+import { init_rpc } from './lib/rpc/index'
 
 init_rpc();
 

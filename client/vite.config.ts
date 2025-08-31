@@ -2,12 +2,44 @@ import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     svelte(),
-    tailwindcss()
+    tailwindcss(),
+    // Custom plugin to serve host.json
+    {
+      name: 'serve-host-json',
+      configureServer(server) {
+        server.middlewares.use('/host.json', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+          if (req.method === 'GET') {
+            const hostJsonPath = path.resolve(__dirname, 'dist/host.json')
+            try {
+              if (fs.existsSync(hostJsonPath)) {
+                const content = fs.readFileSync(hostJsonPath, 'utf-8')
+                res.setHeader('Content-Type', 'application/json')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(content)
+              } else {
+                res.statusCode = 404
+                res.end('host.json not found')
+              }
+            } catch (error) {
+              res.statusCode = 500
+              res.end('Error reading host.json')
+            }
+          } else {
+            next()
+          }
+        })
+      }
+    }
   ],
   resolve: {
     alias: {

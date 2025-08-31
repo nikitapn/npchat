@@ -2,20 +2,35 @@
 
 set -e
 
+USE_SSL=0
 BUILD_TYPE=Debug
 
 cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
 cmake --build .build_local
 
-CMD=".build_local/${BUILD_TYPE}/npchat \
-    --hostname archvm.lan \
-    --port 8443 \
-    --http-dir ./client/dist \
-    --data-dir ./sample_data \
-    --public-cert certs/archvm.lan.crt \
-    --private-key certs/archvm.lan.key \
-    --dh-params certs/dhparam.pem \
-    --trace"
+CMD=(
+    .build_local/${BUILD_TYPE}/npchat
+    --hostname archvm.lan
+    --http-dir ./client/dist
+    --data-dir ./sample_data
+    --trace
+)
+
+if [ $USE_SSL -eq 1 ]; then
+    CMD+=(
+        --use-ssl
+        --port 8443
+        --public-cert certs/archvm.lan.crt
+        --private-key certs/archvm.lan.key
+        --dh-params certs/dhparam.pem
+    )
+else
+    CMD+=(
+        --port 8080
+    )
+fi
+
+CMD=${CMD[@]}
 
 if [ "$1" == "debug" ]; then
     CMD="gdb --args $CMD"
