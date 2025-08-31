@@ -26,6 +26,10 @@ private:
   sqlite3_stmt* insert_attachment_stmt_;
   sqlite3_stmt* get_attachment_stmt_;
   sqlite3_stmt* find_existing_chat_stmt_;
+  sqlite3_stmt* get_user_chats_details_stmt_;
+  sqlite3_stmt* remove_participant_stmt_;
+  sqlite3_stmt* delete_chat_stmt_;
+  sqlite3_stmt* delete_chat_messages_stmt_;
 
   std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> chat_participants_cache_;
 
@@ -81,6 +85,24 @@ public:
       "WHERE cp1.user_id = ? AND cp2.user_id = ? AND cp1.user_id != cp2.user_id "
       "AND (SELECT COUNT(*) FROM chat_participants cp WHERE cp.chat_id = c.id) = 2 "
       "LIMIT 1");
+    
+    get_user_chats_details_stmt_ = db_->prepareStatement(
+      "SELECT DISTINCT c.id, c.created_by, c.created_at, "
+      "       (SELECT COUNT(*) FROM chat_participants cp WHERE cp.chat_id = c.id) as participant_count, "
+      "       (SELECT MAX(m.timestamp) FROM messages m WHERE m.chat_id = c.id) as last_message_time "
+      "FROM chats c "
+      "JOIN chat_participants cp ON c.id = cp.chat_id "
+      "WHERE cp.user_id = ? "
+      "ORDER BY last_message_time DESC NULLS LAST");
+    
+    remove_participant_stmt_ = db_->prepareStatement(
+      "DELETE FROM chat_participants WHERE chat_id = ? AND user_id = ?");
+    
+    delete_chat_stmt_ = db_->prepareStatement(
+      "DELETE FROM chats WHERE id = ?");
+    
+    delete_chat_messages_stmt_ = db_->prepareStatement(
+      "DELETE FROM messages WHERE chat_id = ?");
   }
 
   ~ChatService() {
@@ -95,6 +117,10 @@ public:
     sqlite3_finalize(insert_attachment_stmt_);
     sqlite3_finalize(get_attachment_stmt_);
     sqlite3_finalize(find_existing_chat_stmt_);
+    sqlite3_finalize(get_user_chats_details_stmt_);
+    sqlite3_finalize(remove_participant_stmt_);
+    sqlite3_finalize(delete_chat_stmt_);
+    sqlite3_finalize(delete_chat_messages_stmt_);
   }
 
   std::uint32_t createChat(std::uint32_t creator_id, const std::vector<std::uint32_t>& participant_ids) {
@@ -320,6 +346,32 @@ public:
     return chats;
   }
 
+  npchat::ChatList getUserChatsWithDetails(std::uint32_t user_id) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    npchat::ChatList chats;
+    
+    sqlite3_bind_int(get_user_chats_details_stmt_, 1, user_id);
+    
+    while (sqlite3_step(get_user_chats_details_stmt_) == SQLITE_ROW) {
+      npchat::Chat chat;
+      chat.id = sqlite3_column_int(get_user_chats_details_stmt_, 0);
+      chat.createdBy = sqlite3_column_int(get_user_chats_details_stmt_, 1);
+      chat.createdAt = sqlite3_column_int(get_user_chats_details_stmt_, 2);
+      chat.participantCount = sqlite3_column_int(get_user_chats_details_stmt_, 3);
+      
+      // Handle optional last message time
+      if (sqlite3_column_type(get_user_chats_details_stmt_, 4) != SQLITE_NULL) {
+        chat.lastMessageTime = sqlite3_column_int(get_user_chats_details_stmt_, 4);
+      }
+      
+      chats.push_back(std::move(chat));
+    }
+    
+    sqlite3_reset(get_user_chats_details_stmt_);
+    return chats;
+  }
+
   // Find existing chat between two users, or create a new one
   npchat::ChatId findOrCreateChatBetween(std::uint32_t user1_id, std::uint32_t user2_id) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
@@ -339,5 +391,117 @@ public:
     // No existing chat found, create a new one
     std::vector<std::uint32_t> participants = {user2_id};
     return createChat(user1_id, participants);
+  }
+
+  // Remove a participant from a chat
+  bool removeParticipant(std::uint32_t requesting_user_id, npchat::ChatId chat_id, std::uint32_t participant_id) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    // Get chat info to check creator
+    sqlite3_bind_int(get_user_chats_details_stmt_, 1, requesting_user_id);
+    
+    bool is_chat_creator = false;
+    bool is_participant = false;
+    std::uint32_t chat_creator_id = 0;
+    
+    while (sqlite3_step(get_user_chats_details_stmt_) == SQLITE_ROW) {
+      std::uint32_t current_chat_id = sqlite3_column_int(get_user_chats_details_stmt_, 0);
+      if (current_chat_id == chat_id) {
+        chat_creator_id = sqlite3_column_int(get_user_chats_details_stmt_, 1);
+        is_chat_creator = (chat_creator_id == requesting_user_id);
+        is_participant = true;
+        break;
+      }
+    }
+    sqlite3_reset(get_user_chats_details_stmt_);
+    
+    if (!is_participant) {
+      throw std::runtime_error("User is not a participant in this chat");
+    }
+    
+    // Authorization check:
+    // - Chat creator can remove anyone
+    // - Any participant can remove themselves
+    if (!is_chat_creator && requesting_user_id != participant_id) {
+      throw std::runtime_error("Only chat creator can remove other participants");
+    }
+    
+    // Remove the participant
+    sqlite3_bind_int(remove_participant_stmt_, 1, chat_id);
+    sqlite3_bind_int(remove_participant_stmt_, 2, participant_id);
+    
+    bool success = (sqlite3_step(remove_participant_stmt_) == SQLITE_DONE);
+    sqlite3_reset(remove_participant_stmt_);
+    
+    if (success) {
+      // Update cache
+      auto it = chat_participants_cache_.find(chat_id);
+      if (it != chat_participants_cache_.end()) {
+        auto& participants = it->second;
+        participants.erase(std::remove(participants.begin(), participants.end(), participant_id), participants.end());
+        
+        // If no participants left, delete the entire chat
+        if (participants.empty()) {
+          deleteChat(chat_id);
+          chat_participants_cache_.erase(it);
+        }
+      }
+    }
+    
+    return success;
+  }
+
+  // Delete an entire chat (used when last participant leaves)
+  bool deleteChat(npchat::ChatId chat_id) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    // Delete all messages first (foreign key constraint)
+    sqlite3_bind_int(delete_chat_messages_stmt_, 1, chat_id);
+    sqlite3_step(delete_chat_messages_stmt_);
+    sqlite3_reset(delete_chat_messages_stmt_);
+    
+    // Delete the chat
+    sqlite3_bind_int(delete_chat_stmt_, 1, chat_id);
+    bool success = (sqlite3_step(delete_chat_stmt_) == SQLITE_DONE);
+    sqlite3_reset(delete_chat_stmt_);
+    
+    if (success) {
+      // Remove from cache
+      chat_participants_cache_.erase(chat_id);
+    }
+    
+    return success;
+  }
+
+  // Get chat creator ID
+  std::uint32_t getChatCreator(npchat::ChatId chat_id) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    // We can reuse the get_user_chats_details_stmt but we need a specific query
+    // For now, let's use a simple approach by getting participants and checking the creator field
+    auto participants = getChatParticipants(chat_id);
+    if (participants.empty()) {
+      throw std::runtime_error("Chat not found or has no participants");
+    }
+    
+    // Use the details query to get creator info
+    sqlite3_stmt* get_chat_creator_stmt = db_->prepareStatement(
+      "SELECT created_by FROM chats WHERE id = ?");
+    
+    sqlite3_bind_int(get_chat_creator_stmt, 1, chat_id);
+    
+    std::uint32_t creator_id = 0;
+    if (sqlite3_step(get_chat_creator_stmt) == SQLITE_ROW) {
+      creator_id = sqlite3_column_int(get_chat_creator_stmt, 0);
+    }
+    
+    sqlite3_reset(get_chat_creator_stmt);
+    sqlite3_finalize(get_chat_creator_stmt);
+    
+    if (creator_id == 0) {
+      throw std::runtime_error("Chat not found");
+    }
+    
+    return creator_id;
   }
 };

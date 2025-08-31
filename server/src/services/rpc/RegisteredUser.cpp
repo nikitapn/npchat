@@ -86,13 +86,9 @@ npchat::ChatList RegisteredUserImpl::GetChats() {
   spdlog::info("GetChats called for user ID: {}", userId_);
   
   try {
-    // ChatService::getUserChats returns vector<ChatId>, but we need ChatList (vector<Chat>)
-    // We need to get the full chat information for each chat ID
-    auto chatIds = chatService_->getUserChats(userId_);
-    npchat::ChatList chats;
-    
-    // TODO: Implement getting full chat info - for now return empty list
-    spdlog::info("Retrieved {} chats for user ID: {}", chatIds.size(), userId_);
+    // Use the new method that returns full chat details
+    auto chats = chatService_->getUserChatsWithDetails(userId_);
+    spdlog::info("Retrieved {} chats for user ID: {}", chats.size(), userId_);
     return chats;
   } catch (const std::exception& e) {
     spdlog::error("Error getting chats for user ID {}: {}", userId_, e.what());
@@ -158,12 +154,35 @@ void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::Use
                userId_, chatId, participantUserId);
   
   try {
-    // TODO: Add method to ChatService to remove a participant
-    spdlog::info("Removed participant {} from chat {} by user ID: {}", participantUserId, chatId, userId_);
-  } catch (const std::exception& e) {
+    // Use ChatService to remove the participant with proper authorization
+    bool success = chatService_->removeParticipant(userId_, chatId, participantUserId);
+    
+    if (success) {
+      spdlog::info("Successfully removed participant {} from chat {} by user ID: {}", 
+                   participantUserId, chatId, userId_);
+    } else {
+      spdlog::warn("Failed to remove participant {} from chat {} by user ID: {}", 
+                   participantUserId, chatId, userId_);
+    }
+  } catch (const std::runtime_error& e) {
+    std::string errorMsg = e.what();
     spdlog::error("Error removing participant {} from chat {} by user ID {}: {}", 
+                  participantUserId, chatId, userId_, errorMsg);
+    
+    // Convert runtime errors to proper NPRPC exceptions
+    if (errorMsg.find("not a participant") != std::string::npos) {
+      throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
+    } else if (errorMsg.find("not found") != std::string::npos || errorMsg.find("Chat not found") != std::string::npos) {
+      throw npchat::ChatOperationFailed(npchat::ChatError::ChatNotFound);
+    } else if (errorMsg.find("Only chat creator") != std::string::npos) {
+      throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant); // Closest error for "not authorized"
+    } else {
+      throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
+    }
+  } catch (const std::exception& e) {
+    spdlog::error("Unexpected error removing participant {} from chat {} by user ID {}: {}", 
                   participantUserId, chatId, userId_, e.what());
-    throw;
+    throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
   }
 }
 
