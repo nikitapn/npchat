@@ -72,7 +72,7 @@
 	<div class="max-w-7xl mx-auto p-4">
 		<div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
 			<!-- Sidebar -->
-			<div class="lg:col-span-1 space-y-4">
+			<div class="lg:col-span-1 h-screen flex flex-col space-y-4">
 				<!-- Navigation Tabs -->
 				<div class="bg-white rounded-lg shadow p-2">
 					<div class="flex space-x-1">
@@ -107,23 +107,25 @@
 				</div>
 
 				<!-- Content based on selected view -->
-				{#if selectedView === 'chats'}
-					<ChatList 
-						{registeredUser} 
-						{currentChatId} 
-						onSelectChat={selectChat}
-						onCreateNewChat={createNewChat}
-					/>
-				{:else}
-					<ContactList 
-						{registeredUser} 
-						onCreateChat={createChatWithContact}
-					/>
-				{/if}
+				<div class="flex-1 min-h-0">
+					{#if selectedView === 'chats'}
+						<ChatList 
+							{registeredUser} 
+							{currentChatId} 
+							onSelectChat={selectChat}
+							onCreateNewChat={createNewChat}
+						/>
+					{:else}
+						<ContactList 
+							{registeredUser} 
+							onCreateChat={createChatWithContact}
+						/>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Main Chat Area -->
-			<div class="lg:col-span-3">
+			<div class="lg:col-span-3 h-screen">
 				{#if currentChatId}
 					<ChatRoom currentChatId={currentChatId} />
 				{:else}

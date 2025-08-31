@@ -97,8 +97,8 @@
 	});
 </script>
 
-<div class="bg-white rounded-lg shadow p-4">
-	<div class="flex justify-between items-center mb-4">
+<div class="bg-white rounded-lg shadow h-full flex flex-col">
+	<div class="flex justify-between items-center p-4 border-b border-gray-200">
 		<h3 class="text-lg font-semibold text-gray-900">Contacts</h3>
 		<button
 			onclick={() => showAddContact = !showAddContact}
@@ -108,7 +108,7 @@
 		</button>
 	</div>
 
-	{#if showAddContact}
+	<div class="flex-1 overflow-y-auto p-4">{#if showAddContact}
 		<!-- Add Contact Section -->
 		<div class="mb-4 p-3 bg-gray-50 rounded-lg">
 			<div class="mb-3">
@@ -193,5 +193,6 @@
 				No contacts yet. Add some contacts to start chatting!
 			</div>
 		{/each}
+	</div>
 	</div>
 </div>

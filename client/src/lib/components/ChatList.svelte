@@ -199,8 +199,8 @@
 	}
 </script>
 
-<div class="bg-white rounded-lg shadow p-4">
-	<div class="flex justify-between items-center mb-4">
+<div class="bg-white rounded-lg shadow h-full flex flex-col">
+	<div class="flex justify-between items-center p-4 border-b border-gray-200">
 		<h3 class="text-lg font-semibold text-gray-900">{$_('chat.title')}</h3>
 		<button
 			onclick={handleCreateNewChat}
@@ -210,7 +210,8 @@
 		</button>
 	</div>
 
-	<div class="space-y-2">
+	<div class="flex-1 overflow-y-auto p-4">
+		<div class="space-y-2">
 		{#each chats as chat}
 			{@const unreadCount = chatService.getUnreadCount(chat.id)}
 			<button 
@@ -262,6 +263,7 @@
 				{$_('chat.noChats')}
 			</div>
 		{/each}
+		</div>
 	</div>
 </div>
 

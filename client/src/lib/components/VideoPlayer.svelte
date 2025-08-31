@@ -131,52 +131,60 @@
 	});
 </script>
 
-<div class="video-player-container rounded-lg overflow-hidden bg-black relative">
+<div class="video-player-container rounded-lg overflow-hidden bg-gray-100">
 	<!-- Video Element - Always present for binding but hidden when not needed -->
-	<video
-		bind:this={videoElement}
-		controls={showControls}
-		class="w-full max-h-96 bg-black"
-		class:hidden={isLoading || hasError}
-		preload="metadata"
-		poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23000' width='100' height='100'/%3E%3Ctext y='50' x='50' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='40'%3E▶%3C/text%3E%3C/svg%3E"
-	>
-		<track kind="captions" src="" label="No captions available" />
-		Your browser does not support the video tag.
-	</video>
+	<div class="relative bg-black rounded-t-lg overflow-hidden">
+		<video
+			bind:this={videoElement}
+			controls={showControls}
+			class="w-full max-h-96 bg-black"
+			class:hidden={isLoading || hasError}
+			preload="metadata"
+			controlslist="download"
+			poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23000' width='100' height='100'/%3E%3Ctext y='50' x='50' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='40'%3E▶%3C/text%3E%3C/svg%3E"
+		>
+			<track kind="captions" src="" label="No captions available" />
+			Your browser does not support the video tag.
+		</video>
 
-	{#if isLoading}
-		<div class="flex items-center justify-center h-48 bg-gray-100">
-			<div class="text-center">
-				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-				<p class="text-sm text-gray-600">Loading video...</p>
+		{#if isLoading}
+			<div class="flex items-center justify-center h-48 bg-gray-100">
+				<div class="text-center">
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+					<p class="text-sm text-gray-600">Loading video...</p>
+				</div>
 			</div>
-		</div>
-	{:else if hasError}
-		<div class="flex items-center justify-center h-48 bg-red-50">
-			<div class="text-center">
-				<p class="text-red-600 mb-2">Failed to load video</p>
-				<p class="text-xs text-red-500 mb-3">{errorMessage}</p>
-				<button
-					onclick={downloadVideo}
-					class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-				>
-					Download Video
-				</button>
+		{:else if hasError}
+			<div class="flex items-center justify-center h-48 bg-red-50">
+				<div class="text-center">
+					<p class="text-red-600 mb-2">Failed to load video</p>
+					<p class="text-xs text-red-500 mb-3">{errorMessage}</p>
+					<button
+						onclick={downloadVideo}
+						class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+					>
+						Download Video
+					</button>
+				</div>
 			</div>
-		</div>
-	{:else}
-		<!-- Video Info Overlay -->
-		<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+		{/if}
+	</div>
+
+	<!-- Video Info Below Video (not overlay) -->
+	{#if !isLoading && !hasError}
+		<div class="bg-gray-50 px-4 py-3 rounded-b-lg border-t border-gray-200">
 			<div class="flex items-center justify-between">
-				<div class="text-white text-sm">
-					<div class="font-medium">{fileName}</div>
-					<div class="text-xs opacity-75">{formatFileSize(videoData.length)}</div>
+				<div class="text-gray-800 text-sm flex-1 min-w-0">
+					<div class="font-medium truncate">{fileName}</div>
+					<div class="text-xs text-gray-500">{formatFileSize(videoData.length)}</div>
 				</div>
 				<button
 					onclick={downloadVideo}
-					class="px-3 py-1 bg-white/20 text-white rounded text-sm hover:bg-white/30 transition-colors"
+					class="ml-3 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors flex items-center gap-1"
 				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+					</svg>
 					Download
 				</button>
 			</div>
@@ -187,9 +195,31 @@
 <style>
 	.video-player-container {
 		max-width: 500px;
+		box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+	}
+	
+	video {
+		outline: none;
 	}
 	
 	video::-webkit-media-controls-panel {
 		background-color: rgba(0, 0, 0, 0.8);
+	}
+	
+	video::-webkit-media-controls-play-button,
+	video::-webkit-media-controls-pause-button {
+		background-color: rgba(255, 255, 255, 0.9);
+		border-radius: 50%;
+	}
+	
+	video::-webkit-media-controls-volume-slider,
+	video::-webkit-media-controls-timeline {
+		background-color: rgba(255, 255, 255, 0.3);
+	}
+	
+	video::-webkit-media-controls-current-time-display,
+	video::-webkit-media-controls-time-remaining-display {
+		color: white;
+		text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
 	}
 </style>

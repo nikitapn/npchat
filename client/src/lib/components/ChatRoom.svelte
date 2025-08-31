@@ -31,6 +31,7 @@
 	let newMessage = $state('');
 	let selectedFile: File | null = $state(null);
 	let fileInputRef: HTMLInputElement;
+	let messagesContainer: HTMLDivElement;
 
 	// Group messages by sender and time proximity
 	function groupMessages(msgs: Message[]): MessageGroup[] {
@@ -70,6 +71,22 @@
 	// Update message groups when messages change
 	$effect(() => {
 		messageGroups = groupMessages(messages);
+	});
+
+	// Auto-scroll to bottom when new messages arrive
+	function scrollToBottom() {
+		if (messagesContainer) {
+			messagesContainer.scrollTop = messagesContainer.scrollHeight;
+		}
+	}
+
+	// Effect to scroll to bottom when messages change
+	$effect(() => {
+		// Watch messageGroups for changes
+		if (messageGroups.length > 0) {
+			// Use setTimeout to ensure DOM has updated
+			setTimeout(scrollToBottom, 50);
+		}
 	});
 
 	// Utility functions for attachment handling
@@ -249,10 +266,10 @@
 	});
 </script>
 
-<div class="min-h-screen bg-gray-50 flex flex-col">
+<div class="h-full bg-white rounded-lg shadow flex flex-col">
 	<!-- Header -->
-	<div class="bg-white shadow-sm border-b border-gray-200 p-4">
-		<div class="max-w-4xl mx-auto flex justify-between items-center">
+	<div class="bg-white shadow-sm border-b border-gray-200 p-4 rounded-t-lg">
+		<div class="flex justify-between items-center">
 			<h1 class="text-xl font-semibold text-gray-900">Chat Room #{currentChatId}</h1>
 			<div class="text-sm text-gray-500">
 				{authService.authState.userData?.name}
@@ -262,8 +279,8 @@
 
 	<!-- Messages Area -->
 	<div class="flex-1 overflow-hidden">
-		<div class="max-w-4xl mx-auto h-full flex flex-col">
-			<div class="flex-1 overflow-y-auto p-4 space-y-4">
+		<div class="h-full flex flex-col">
+			<div class="flex-1 overflow-y-auto p-4 space-y-4" bind:this={messagesContainer}>
 				{#each messageGroups as group (group.timestamp.getTime())}
 					<div class="flex flex-col space-y-1 {group.isOwnMessage ? 'items-end' : 'items-start'}">
 						<!-- Group header with sender name and timestamp -->
