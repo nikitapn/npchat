@@ -2,7 +2,7 @@
 	import WebRTCCall from './lib/components/WebRTCCall.svelte';
 	import LoginForm from './lib/components/LoginForm.svelte';
 	import RegisterForm from './lib/components/RegisterForm.svelte';
-	import ChatRoom from './lib/components/ChatRoom.svelte';
+	import ChatApp from './lib/components/ChatApp.svelte';
 	import { router } from './lib/Router.svelte';
 	import { authService } from './lib/rpc/services/auth';
 	
@@ -27,7 +27,7 @@
 	{#if router.currentPath === '/webrtc'}
 		<WebRTCCall />
 	{:else if router.currentPath === '/chat'}
-		<ChatRoom />
+		<ChatApp />
 	{:else}
 		<!-- Main dashboard -->
 		<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

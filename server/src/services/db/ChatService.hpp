@@ -12,7 +12,7 @@
 class ChatService {
 private:
   std::shared_ptr<Database> db_;
-  mutable std::mutex mutex_;
+  mutable std::recursive_mutex mutex_;
   
   // Prepared statements
   sqlite3_stmt* insert_message_stmt_;
@@ -88,7 +88,7 @@ public:
   }
 
   std::uint32_t createChat(std::uint32_t creator_id, const std::vector<std::uint32_t>& participant_ids) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     std::uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(
       std::chrono::system_clock::now().time_since_epoch()).count();
@@ -137,7 +137,7 @@ public:
   }
 
   npchat::MessageId sendMessage(std::uint32_t sender_id, npchat::ChatId chat_id, const npchat::ChatMessage& message) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     // Verify sender is participant
     auto participants = getChatParticipants(chat_id);
@@ -184,7 +184,7 @@ public:
   }
 
   std::vector<npchat::ChatMessage> getMessages(npchat::ChatId chat_id, std::uint32_t limit = 50, std::uint32_t offset = 0) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     std::vector<npchat::ChatMessage> messages;
     
@@ -222,7 +222,7 @@ public:
   }
 
   std::optional<npchat::ChatMessage> getMessageById(npchat::MessageId message_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     sqlite3_bind_int(get_message_by_id_stmt_, 1, message_id);
     
@@ -257,7 +257,7 @@ public:
   }
 
   void markMessageDelivered(npchat::MessageId message_id, std::uint32_t user_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     std::uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(
       std::chrono::system_clock::now().time_since_epoch()).count();
@@ -277,7 +277,7 @@ public:
       return it->second;
     }
     
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     std::vector<std::uint32_t> participants;
     
@@ -296,7 +296,7 @@ public:
   }
 
   std::vector<npchat::ChatId> getUserChats(std::uint32_t user_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     
     std::vector<npchat::ChatId> chats;
     

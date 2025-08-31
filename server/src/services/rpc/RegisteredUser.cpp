@@ -185,18 +185,33 @@ npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
     // Notify all chat participants about the new message
     chatObservers_->notify_message_received(messageId, chatMessage);
     
-    // Notify sender about successful delivery (this could be enhanced later)
+    // Notify sender about successful delivery
     chatObservers_->notify_message_delivered(chatId, messageId, userId_);
     
     spdlog::info("Message sent with ID: {} for user ID: {}, chat ID: {}, participants notified", 
                  messageId, userId_, chatId);
     return messageId;
-  } catch (const std::exception& e) {
+  } catch (const std::runtime_error& e) {
+    std::string errorMsg = e.what();
     spdlog::error("Error sending message for user ID {}, chat ID {}: {}", 
+                  userId_, chatId, errorMsg);
+    
+    // Convert runtime_error to proper NPRPC exception
+    if (errorMsg.find("not a participant") != std::string::npos) {
+      throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
+    } else if (errorMsg.find("not found") != std::string::npos) {
+      throw npchat::ChatOperationFailed(npchat::ChatError::ChatNotFound);
+    } else {
+      throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
+    }
+  } catch (const std::exception& e) {
+    spdlog::error("Unexpected error sending message for user ID {}, chat ID {}: {}", 
                   userId_, chatId, e.what());
-    throw;
+    throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
   }
-}npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) {
+}
+
+npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) {
   spdlog::info("GetChatHistory called for user ID: {}, chat ID: {}, limit: {}, offset: {}", 
                userId_, chatId, limit, offset);
   

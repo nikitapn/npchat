@@ -26,6 +26,17 @@ RegistrationFailed: exception {
   reason: RegistrationError;
 }
 
+enum ChatError: u8 {
+  ChatNotFound,
+  UserNotParticipant,
+  MessageTooLong,
+  InvalidMessage,
+}
+
+ChatOperationFailed: exception {
+  reason: ChatError;
+}
+
 UserData: flat {
   name: string;
   sessionId: string;
@@ -90,7 +101,8 @@ interface RegisteredUser {
   
   // Message operations
   void SubscribeToEvents(listener: in object /* ChatListener */);
-  MessageId SendMessage(chatId: in ChatId, message: in ChatMessage);
+  MessageId SendMessage(chatId: in ChatId, message: in ChatMessage)
+    raises(ChatOperationFailed);
   MessageList GetChatHistory(chatId: in ChatId, limit: in u32, offset: in u32);
   u32 GetUnreadMessageCount();
   void MarkMessageAsRead(messageId: in MessageId);

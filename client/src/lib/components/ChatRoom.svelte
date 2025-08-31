@@ -5,6 +5,12 @@
 	import { poa } from '../rpc/index';
 	import * as NPRPC from 'nprpc';
 
+	interface ChatRoomProps {
+		currentChatId: ChatId;
+	}
+
+	let { currentChatId }: ChatRoomProps = $props();
+
 	interface Message {
 		id: MessageId;
 		text: string;
@@ -14,7 +20,6 @@
 
 	let messages: Message[] = $state([]);
 	let newMessage = $state('');
-	let chatId: ChatId = 1; // Default chat room
 	let registeredUser: RegisteredUser | null = null;
 	let chatListener: ChatListenerImpl | null = null;
 
@@ -24,7 +29,7 @@
 			console.log('Real-time message received:', messageId, message);
 			
 			// Only add message if it's for our current chat
-			if (message.chatId === chatId) {
+			if (message.chatId === currentChatId) {
 				const newMsg: Message = {
 					id: messageId,
 					text: message.str,
@@ -82,13 +87,13 @@
 
 		try {
 			const chatMessage: ChatMessage = {
-				chatId: chatId,
+				chatId: currentChatId,
 				timestamp: Date.now(),
 				str: newMessage.trim(),
 				attachment: undefined
 			};
 
-			const messageId = await registeredUser.SendMessage(chatId, chatMessage);
+			const messageId = await registeredUser.SendMessage(currentChatId, chatMessage);
 			
 			// Add message to local list immediately for immediate feedback
 			const localMessage: Message = {
@@ -102,8 +107,24 @@
 
 			newMessage = '';
 			console.log('Message sent with ID:', messageId);
-		} catch (error) {
+		} catch (error: any) {
 			console.error('Failed to send message:', error);
+			
+			// Handle specific chat errors
+			if (error.name === 'ChatOperationFailed') {
+				switch (error.reason) {
+					case 1: // UserNotParticipant
+						alert('You are not a participant in this chat. Please create a new chat.');
+						break;
+					case 0: // ChatNotFound
+						alert('Chat not found. Please create a new chat.');
+						break;
+					default:
+						alert('Failed to send message: ' + error.message);
+				}
+			} else {
+				alert('Failed to send message: ' + error.message);
+			}
 		}
 	}
 
@@ -140,7 +161,7 @@
 	<!-- Header -->
 	<div class="bg-white shadow-sm border-b border-gray-200 p-4">
 		<div class="max-w-4xl mx-auto flex justify-between items-center">
-			<h1 class="text-xl font-semibold text-gray-900">Chat Room #{chatId}</h1>
+			<h1 class="text-xl font-semibold text-gray-900">Chat Room #{currentChatId}</h1>
 			<div class="text-sm text-gray-500">
 				{authService.authState.userData?.name}
 			</div>
