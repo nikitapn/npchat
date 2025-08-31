@@ -16,8 +16,56 @@
 		sender: string;
 	}
 
+	interface MessageGroup {
+		sender: string;
+		timestamp: Date;
+		messages: Message[];
+		isOwnMessage: boolean;
+	}
+
 	let messages: Message[] = $state([]);
+	let messageGroups: MessageGroup[] = $state([]);
 	let newMessage = $state('');
+
+	// Group messages by sender and time proximity
+	function groupMessages(msgs: Message[]): MessageGroup[] {
+		if (msgs.length === 0) return [];
+
+		const groups: MessageGroup[] = [];
+		const TIME_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+		let currentGroup: MessageGroup | null = null;
+
+		for (const message of msgs) {
+			const isOwnMessage = message.sender === authService.authState.userData?.name || message.sender === 'You';
+			
+			// Check if we should start a new group
+			const shouldStartNewGroup = !currentGroup || 
+				currentGroup.sender !== message.sender ||
+				(message.timestamp.getTime() - currentGroup.timestamp.getTime()) > TIME_THRESHOLD;
+
+			if (shouldStartNewGroup) {
+				// Start a new group
+				currentGroup = {
+					sender: message.sender,
+					timestamp: message.timestamp,
+					messages: [message],
+					isOwnMessage
+				};
+				groups.push(currentGroup);
+			} else {
+				// Add to existing group
+				currentGroup.messages.push(message);
+			}
+		}
+
+		return groups;
+	}
+
+	// Update message groups when messages change
+	$effect(() => {
+		messageGroups = groupMessages(messages);
+	});
 
 	// Convert chat notifications to UI messages
 	function updateMessages() {
@@ -129,22 +177,33 @@
 	<!-- Messages Area -->
 	<div class="flex-1 overflow-hidden">
 		<div class="max-w-4xl mx-auto h-full flex flex-col">
-			<div class="flex-1 overflow-y-auto p-4 space-y-3">
-				{#each messages as message (message.id)}
-					<div class="flex flex-col space-y-1">
-						<div class="flex items-center space-x-2">
-							<span class="text-sm font-medium text-gray-900">{message.sender}</span>
+			<div class="flex-1 overflow-y-auto p-4 space-y-4">
+				{#each messageGroups as group (group.timestamp.getTime())}
+					<div class="flex flex-col space-y-1 {group.isOwnMessage ? 'items-end' : 'items-start'}">
+						<!-- Group header with sender name and timestamp -->
+						<div class="flex items-center space-x-2 {group.isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''} mb-1">
+							<span class="text-sm font-medium text-gray-900">{group.sender}</span>
 							<span class="text-xs text-gray-500">
-								{message.timestamp.toLocaleTimeString()}
+								{group.timestamp.toLocaleTimeString()}
 							</span>
 						</div>
-						<div class="bg-white rounded-lg p-3 shadow-sm border border-gray-200 max-w-md">
-							<p class="text-gray-800">{message.text}</p>
+						
+						<!-- Messages in the group -->
+						<div class="space-y-1 {group.isOwnMessage ? 'items-end' : 'items-start'} flex flex-col">
+							{#each group.messages as message (message.id)}
+								<div class="rounded-lg p-3 shadow-sm border max-w-md {
+									group.isOwnMessage 
+										? 'bg-blue-500 text-white border-blue-600' 
+										: 'bg-white text-gray-800 border-gray-200'
+								}">
+									<p>{message.text}</p>
+								</div>
+							{/each}
 						</div>
 					</div>
 				{/each}
 				
-				{#if messages.length === 0}
+				{#if messageGroups.length === 0}
 					<div class="text-center py-8">
 						<p class="text-gray-500">No messages yet. Start the conversation!</p>
 					</div>
