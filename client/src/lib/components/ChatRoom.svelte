@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ChatId, MessageId } from '../rpc/npchat';
+	import type { ChatId, MessageId, ChatAttachment, ChatAttachmentType } from '../rpc/npchat';
 	import { authService } from '../rpc/services/auth';
 	import { chatService } from '../rpc/services/Chat.svelte';
 
@@ -14,6 +14,7 @@
 		text: string;
 		timestamp: Date;
 		sender: string;
+		attachment?: ChatAttachment;
 	}
 
 	interface MessageGroup {
@@ -26,6 +27,8 @@
 	let messages: Message[] = $state([]);
 	let messageGroups: MessageGroup[] = $state([]);
 	let newMessage = $state('');
+	let selectedFile: File | null = $state(null);
+	let fileInputRef: HTMLInputElement;
 
 	// Group messages by sender and time proximity
 	function groupMessages(msgs: Message[]): MessageGroup[] {
@@ -67,6 +70,59 @@
 		messageGroups = groupMessages(messages);
 	});
 
+	// Utility functions for attachment handling
+	function detectAttachmentType(file: File): ChatAttachmentType {
+		const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+		return imageTypes.includes(file.type) ? 0 : 1; // Picture = 0, File = 1
+	}
+
+	function isImageAttachment(attachment: ChatAttachment): boolean {
+		return attachment.type === 0; // Picture
+	}
+
+	function createImageUrl(data: Uint8Array): string {
+		const blob = new Blob([data], { type: 'image/jpeg' }); // Assume JPEG for now
+		return URL.createObjectURL(blob);
+	}
+
+	function formatFileSize(bytes: number): string {
+		if (bytes === 0) return '0 Bytes';
+		const k = 1024;
+		const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+	}
+
+	// File handling functions
+	function handleFileSelect(event: Event) {
+		const input = event.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			selectedFile = input.files[0];
+		}
+	}
+
+	function clearSelectedFile() {
+		selectedFile = null;
+		if (fileInputRef) {
+			fileInputRef.value = '';
+		}
+	}
+
+	async function fileToUint8Array(file: File): Promise<Uint8Array> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				if (reader.result instanceof ArrayBuffer) {
+					resolve(new Uint8Array(reader.result));
+				} else {
+					reject(new Error('Failed to read file'));
+				}
+			};
+			reader.onerror = () => reject(reader.error);
+			reader.readAsArrayBuffer(file);
+		});
+	}
+
 	// Convert chat notifications to UI messages
 	function updateMessages() {
 		const notifications = chatService.getMessagesForChat(currentChatId);
@@ -74,7 +130,8 @@
 			id: notification.messageId,
 			text: notification.message.str,
 			timestamp: notification.timestamp,
-			sender: 'Other User' // TODO: Get actual sender name from user ID
+			sender: 'Other User', // TODO: Get actual sender name from user ID
+			attachment: notification.message.attachment
 		}));
 	}
 
@@ -86,22 +143,36 @@
 
 	// Send a message
 	async function sendMessage() {
-		if (!newMessage.trim()) return;
+		if (!newMessage.trim() && !selectedFile) return;
 
 		try {
-			const messageId = await chatService.sendMessage(currentChatId, newMessage.trim());
+			let attachment: ChatAttachment | undefined = undefined;
+
+			// Handle file attachment
+			if (selectedFile) {
+				const fileData = await fileToUint8Array(selectedFile);
+				attachment = {
+					type: detectAttachmentType(selectedFile),
+					name: selectedFile.name,
+					data: fileData
+				};
+			}
+
+			const messageId = await chatService.sendMessage(currentChatId, newMessage.trim(), attachment);
 			
 			// Add message to local list immediately for immediate feedback
 			const localMessage: Message = {
 				id: messageId,
 				text: newMessage.trim(),
 				timestamp: new Date(),
-				sender: authService.authState.userData?.name || 'You'
+				sender: authService.authState.userData?.name || 'You',
+				attachment: attachment
 			};
 			messages.push(localMessage);
 			messages = [...messages]; // Trigger reactivity
 
 			newMessage = '';
+			clearSelectedFile();
 			console.log('Message sent with ID:', messageId);
 		} catch (error: any) {
 			console.error('Failed to send message:', error);
@@ -143,7 +214,8 @@
 				id: notification.messageId,
 				text: notification.message.str,
 				timestamp: notification.timestamp,
-				sender: 'Other User' // TODO: Get actual sender name
+				sender: 'Other User', // TODO: Get actual sender name
+				attachment: notification.message.attachment
 			};
 			
 			// Check if message already exists (avoid duplicates)
@@ -196,7 +268,65 @@
 										? 'bg-blue-500 text-white border-blue-600' 
 										: 'bg-white text-gray-800 border-gray-200'
 								}">
-									<p>{message.text}</p>
+									<!-- Text content -->
+									{#if message.text}
+										<p class="mb-2">{message.text}</p>
+									{/if}
+									
+									<!-- Attachment content -->
+									{#if message.attachment}
+										{#if isImageAttachment(message.attachment)}
+											<!-- Image attachment -->
+											<div class="rounded-lg overflow-hidden">
+												<img 
+													src={createImageUrl(message.attachment.data)} 
+													alt={message.attachment.name}
+													class="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+													onclick={() => window.open(createImageUrl(message.attachment.data), '_blank')}
+												/>
+												<div class="text-xs mt-1 opacity-75">
+													{message.attachment.name}
+												</div>
+											</div>
+										{:else}
+											<!-- File attachment -->
+											<div class="flex items-center space-x-2 p-2 rounded {
+												group.isOwnMessage ? 'bg-blue-600' : 'bg-gray-100'
+											}">
+												<div class="text-2xl">📎</div>
+												<div class="flex-1 min-w-0">
+													<div class="text-sm font-medium truncate {
+														group.isOwnMessage ? 'text-white' : 'text-gray-900'
+													}">
+														{message.attachment.name}
+													</div>
+													<div class="text-xs {
+														group.isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+													}">
+														{formatFileSize(message.attachment.data.length)}
+													</div>
+												</div>
+												<button 
+													class="text-sm px-2 py-1 rounded {
+														group.isOwnMessage 
+															? 'bg-blue-700 text-white hover:bg-blue-800' 
+															: 'bg-blue-600 text-white hover:bg-blue-700'
+													}"
+													onclick={() => {
+														const blob = new Blob([message.attachment.data]);
+														const url = URL.createObjectURL(blob);
+														const a = document.createElement('a');
+														a.href = url;
+														a.download = message.attachment.name;
+														a.click();
+														URL.revokeObjectURL(url);
+													}}
+												>
+													Download
+												</button>
+											</div>
+										{/if}
+									{/if}
 								</div>
 							{/each}
 						</div>
@@ -215,17 +345,64 @@
 	<!-- Message Input -->
 	<div class="bg-white border-t border-gray-200 p-4">
 		<div class="max-w-4xl mx-auto">
-			<form onsubmit={(e) => { e.preventDefault(); sendMessage(); }} class="flex space-x-4">
+			<!-- File preview area -->
+			{#if selectedFile}
+				<div class="mb-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+					<div class="flex items-center space-x-3">
+						<div class="text-2xl">
+							{#if detectAttachmentType(selectedFile) === 0}
+								🖼️
+							{:else}
+								📎
+							{/if}
+						</div>
+						<div>
+							<div class="text-sm font-medium text-gray-900">{selectedFile.name}</div>
+							<div class="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</div>
+						</div>
+					</div>
+					<button
+						onclick={clearSelectedFile}
+						class="text-red-600 hover:text-red-800 text-sm font-medium"
+					>
+						Remove
+					</button>
+				</div>
+			{/if}
+
+			<form onsubmit={(e) => { e.preventDefault(); sendMessage(); }} class="flex space-x-2">
+				<!-- File input button -->
+				<button
+					type="button"
+					onclick={() => fileInputRef.click()}
+					class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+					title="Attach file"
+				>
+					📎
+				</button>
+				
+				<!-- Hidden file input -->
+				<input
+					bind:this={fileInputRef}
+					type="file"
+					onchange={handleFileSelect}
+					class="hidden"
+					accept="image/*,*"
+				/>
+
+				<!-- Message input -->
 				<input
 					bind:value={newMessage}
 					onkeydown={handleKeydown}
 					placeholder="Type your message..."
 					class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 				/>
+				
+				<!-- Send button -->
 				<button
 					type="submit"
-					disabled={!newMessage.trim()}
-					class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={!newMessage.trim() && !selectedFile}
+					class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					Send
 				</button>

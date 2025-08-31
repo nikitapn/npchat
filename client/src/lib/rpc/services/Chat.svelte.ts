@@ -1,4 +1,4 @@
-import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList } from '../npchat';
+import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList, ChatAttachment } from '../npchat';
 import { _IChatListener_Servant } from '../npchat';
 import { poa } from '../index';
 import { authService } from './auth';
@@ -76,7 +76,7 @@ class ChatServiceImpl {
 	}
 
 	// Send a message through the registered user
-	async sendMessage(chatId: ChatId, text: string): Promise<MessageId> {
+	async sendMessage(chatId: ChatId, text: string, attachment?: ChatAttachment): Promise<MessageId> {
 		if (!this.registeredUser) {
 			throw new Error('Chat service not initialized');
 		}
@@ -85,7 +85,7 @@ class ChatServiceImpl {
 			chatId: chatId,
 			timestamp: Date.now(),
 			str: text.trim(),
-			attachment: undefined
+			attachment: attachment
 		};
 
 		return await this.registeredUser.SendMessage(chatId, chatMessage);
