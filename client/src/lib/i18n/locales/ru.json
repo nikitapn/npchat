@@ -1,0 +1,116 @@
+{
+  "app": {
+    "title": "NPChat",
+    "welcome": "Добро пожаловать в NPChat",
+    "loading": "Загрузка..."
+  },
+  "auth": {
+    "login": "Войти",
+    "logout": "Выйти",
+    "register": "Регистрация",
+    "username": "Имя пользователя",
+    "email": "Электронная почта",
+    "password": "Пароль",
+    "confirmPassword": "Подтвердите пароль",
+    "loginButton": "Войти",
+    "registerButton": "Зарегистрироваться",
+    "forgotPassword": "Забыли пароль?",
+    "alreadyHaveAccount": "Уже есть аккаунт?",
+    "dontHaveAccount": "Нет аккаунта?",
+    "verificationCode": "Код подтверждения",
+    "verifyButton": "Подтвердить",
+    "errors": {
+      "invalidCredentials": "Неверное имя пользователя или пароль",
+      "accessDenied": "Доступ запрещен",
+      "authenticationFailed": "Ошибка аутентификации",
+      "sessionExpired": "Сессия истекла или недействительна",
+      "usernameRequired": "Требуется имя пользователя",
+      "emailRequired": "Требуется электронная почта",
+      "passwordRequired": "Требуется пароль",
+      "passwordMismatch": "Пароли не совпадают",
+      "invalidEmail": "Неверный формат электронной почты",
+      "usernameAlreadyTaken": "Имя пользователя уже занято",
+      "emailAlreadyRegistered": "Электронная почта уже зарегистрирована",
+      "invalidUsername": "Неверный формат имени пользователя",
+      "registrationFailed": "Ошибка регистрации",
+      "invalidVerificationCode": "Неверный код подтверждения",
+      "registrationVerificationFailed": "Ошибка подтверждения регистрации"
+    }
+  },
+  "chat": {
+    "title": "Чаты",
+    "newChat": "Новый чат",
+    "openChat": "Открыть чат",
+    "leaveChat": "Покинуть чат",
+    "deleteChat": "Удалить чат",
+    "cancel": "Отмена",
+    "sendMessage": "Отправить сообщение",
+    "typeMessage": "Введите ваше сообщение...",
+    "participantCount": "{count, plural, =1 {1 участник} few {# участника} many {# участников} other {# участников}}",
+    "lastMessage": "Последнее сообщение: {time}",
+    "unreadMessages": "{count, plural, =1 {1 непрочитанное} few {# непрочитанных} many {# непрочитанных} other {# непрочитанных}}",
+    "chatRoom": "Комната чата #{id}",
+    "noChats": "Пока нет чатов. Создайте новый чат, чтобы начать!",
+    "confirmations": {
+      "deleteChat": "Вы уверены, что хотите удалить Чат #{id}? Это действие нельзя отменить.",
+      "leaveChat": "Вы уверены, что хотите покинуть Чат #{id}?"
+    },
+    "errors": {
+      "failedToDeleteChat": "Не удалось удалить чат. Попробуйте еще раз.",
+      "failedToLeaveChat": "Не удалось покинуть чат. Попробуйте еще раз.",
+      "failedToSendMessage": "Не удалось отправить сообщение. Попробуйте еще раз.",
+      "failedToLoadChats": "Не удалось загрузить чаты. Попробуйте еще раз.",
+      "noRegisteredUser": "Зарегистрированный пользователь недоступен",
+      "userNotAuthenticated": "Пользователь не аутентифицирован"
+    }
+  },
+  "contacts": {
+    "title": "Контакты",
+    "search": "Поиск пользователей...",
+    "addContact": "Добавить контакт",
+    "createChatWith": "Создать чат",
+    "noResults": "Пользователи не найдены",
+    "searchPlaceholder": "Введите имя пользователя для поиска..."
+  },
+  "webrtc": {
+    "title": "Видеозвонок",
+    "startCall": "Начать звонок",
+    "joinCall": "Присоединиться к звонку",
+    "endCall": "Завершить звонок",
+    "localOffer": "Локальное предложение",
+    "remoteAnswer": "Удаленный ответ",
+    "copyOffer": "Скопировать предложение",
+    "copyAnswer": "Скопировать ответ",
+    "pasteAnswer": "Вставьте ответ здесь",
+    "pasteOffer": "Вставьте предложение здесь",
+    "connectionStatus": "Состояние соединения: {status}",
+    "callStatus": "Состояние звонка: {status}",
+    "states": {
+      "notConnected": "Не подключено",
+      "connecting": "Подключение",
+      "connected": "Подключено",
+      "disconnected": "Отключено",
+      "callActive": "Звонок активен",
+      "callInactive": "Звонок неактивен"
+    }
+  },
+  "common": {
+    "ok": "ОК",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "close": "Закрыть",
+    "back": "Назад",
+    "next": "Далее",
+    "previous": "Предыдущий",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успех",
+    "warning": "Предупреждение",
+    "info": "Информация",
+    "yes": "Да",
+    "no": "Нет",
+    "retry": "Повторить"
+  }
+}

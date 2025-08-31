@@ -3,6 +3,7 @@
 	import { chatService } from '../rpc/services/Chat.svelte';
 	import { authService } from '../rpc/services/auth';
 	import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
+	import { _ } from '../i18n';
 
 	interface ChatListProps {
 		registeredUser: RegisteredUser | null;
@@ -25,7 +26,7 @@
 	function getContextMenuItems(chat: Chat): ContextMenuItem[] {
 		return [
 			{
-				label: 'Open Chat',
+				label: $_('chat.openChat'),
 				icon: 'open',
 				action: () => {
 					onSelectChat(chat.id);
@@ -38,12 +39,13 @@
 				action: () => {}
 			},
 			{
-				label: 'Leave Chat',
-				icon: 'leave',
+				label: $_('chat.leaveChat'),
+				icon: 'exit',
+				className: 'text-yellow-700 hover:bg-yellow-50',
 				action: () => leaveChat(chat.id)
 			},
-			...(chat.participantCount === 1 ? [{
-				label: 'Delete Chat',
+			...(chat.canDelete ? [{
+				label: $_('chat.deleteChat'),
 				icon: 'delete',
 				className: 'text-red-600 hover:bg-red-50',
 				action: () => deleteChat(chat.id)
@@ -54,7 +56,7 @@
 				action: () => {}
 			},
 			{
-				label: 'Cancel',
+				label: $_('chat.cancel'),
 				icon: 'cancel',
 				className: 'text-gray-500 hover:bg-gray-100',
 				action: () => hideContextMenu()
@@ -140,7 +142,7 @@
 			return;
 		}
 
-		const confirmMessage = `Are you sure you want to delete Chat #${chatId}? This action cannot be undone.`;
+		const confirmMessage = $_('chat.confirmations.deleteChat', { values: { id: chatId } });
 		if (!confirm(confirmMessage)) {
 			return;
 		}
@@ -160,7 +162,7 @@
 			}
 		} catch (error) {
 			console.error('Failed to delete chat:', error);
-			alert('Failed to delete chat. Please try again.');
+			alert($_('chat.errors.failedToDeleteChat'));
 		} finally {
 			hideContextMenu();
 		}
@@ -169,7 +171,7 @@
 	async function leaveChat(chatId: ChatId) {
 		if (!registeredUser || !chatId) return;
 
-		const confirmed = confirm('Are you sure you want to leave this chat?');
+		const confirmed = confirm($_('chat.confirmations.leaveChat', { values: { id: chatId } }));
 		if (!confirmed) {
 			hideContextMenu();
 			return;
@@ -190,7 +192,7 @@
 			}
 		} catch (error) {
 			console.error('Failed to leave chat:', error);
-			alert('Failed to leave chat. Please try again.');
+			alert($_('chat.errors.failedToLeaveChat'));
 		} finally {
 			hideContextMenu();
 		}
@@ -199,12 +201,12 @@
 
 <div class="bg-white rounded-lg shadow p-4">
 	<div class="flex justify-between items-center mb-4">
-		<h3 class="text-lg font-semibold text-gray-900">Chats</h3>
+		<h3 class="text-lg font-semibold text-gray-900">{$_('chat.title')}</h3>
 		<button
 			onclick={handleCreateNewChat}
 			class="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
 		>
-			New Chat
+			{$_('chat.newChat')}
 		</button>
 	</div>
 
@@ -238,14 +240,14 @@
 					</div>
 					<div>
 						<div class="font-medium text-gray-900 {unreadCount > 0 ? 'font-bold' : ''}">
-							Chat Room #{chat.id}
+							{$_('chat.chatRoom', { values: { id: chat.id } })}
 						</div>
 						<div class="text-sm text-gray-500">
-							{chat.participantCount} participant{chat.participantCount !== 1 ? 's' : ''}
+							{$_('chat.participantCount', { values: { count: chat.participantCount } })}
 						</div>
 						{#if chat.lastMessageTime}
 							<div class="text-xs text-gray-400">
-								Last message: {new Date(chat.lastMessageTime * 1000).toLocaleString()}
+								{$_('chat.lastMessage', { values: { time: new Date(chat.lastMessageTime * 1000).toLocaleString() } })}
 							</div>
 						{/if}
 					</div>
@@ -257,7 +259,7 @@
 			</button>
 		{:else}
 			<div class="text-center text-gray-500 py-4">
-				No chats yet. Create a new chat to get started!
+				{$_('chat.noChats')}
 			</div>
 		{/each}
 	</div>

@@ -1,0 +1,116 @@
+{
+  "app": {
+    "title": "NPChat",
+    "welcome": "Welcome to NPChat",
+    "loading": "Loading..."
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "username": "Username",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "loginButton": "Sign In",
+    "registerButton": "Sign Up",
+    "forgotPassword": "Forgot Password?",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "verificationCode": "Verification Code",
+    "verifyButton": "Verify",
+    "errors": {
+      "invalidCredentials": "Invalid username or password",
+      "accessDenied": "Access denied",
+      "authenticationFailed": "Authentication failed",
+      "sessionExpired": "Session expired or invalid",
+      "usernameRequired": "Username is required",
+      "emailRequired": "Email is required",
+      "passwordRequired": "Password is required",
+      "passwordMismatch": "Passwords do not match",
+      "invalidEmail": "Invalid email format",
+      "usernameAlreadyTaken": "Username is already taken",
+      "emailAlreadyRegistered": "Email is already registered",
+      "invalidUsername": "Invalid username format",
+      "registrationFailed": "Registration failed",
+      "invalidVerificationCode": "Invalid verification code",
+      "registrationVerificationFailed": "Registration verification failed"
+    }
+  },
+  "chat": {
+    "title": "Chats",
+    "newChat": "New Chat",
+    "openChat": "Open Chat",
+    "leaveChat": "Leave Chat",
+    "deleteChat": "Delete Chat",
+    "cancel": "Cancel",
+    "sendMessage": "Send Message",
+    "typeMessage": "Type your message...",
+    "participantCount": "{count, plural, =1 {1 participant} other {# participants}}",
+    "lastMessage": "Last message: {time}",
+    "unreadMessages": "{count, plural, =1 {1 unread} other {# unread}}",
+    "chatRoom": "Chat Room #{id}",
+    "noChats": "No chats yet. Create a new chat to get started!",
+    "confirmations": {
+      "deleteChat": "Are you sure you want to delete Chat #{id}? This action cannot be undone.",
+      "leaveChat": "Are you sure you want to leave Chat #{id}?"
+    },
+    "errors": {
+      "failedToDeleteChat": "Failed to delete chat. Please try again.",
+      "failedToLeaveChat": "Failed to leave chat. Please try again.",
+      "failedToSendMessage": "Failed to send message. Please try again.",
+      "failedToLoadChats": "Failed to load chats. Please try again.",
+      "noRegisteredUser": "No registered user available",
+      "userNotAuthenticated": "User is not authenticated"
+    }
+  },
+  "contacts": {
+    "title": "Contacts",
+    "search": "Search users...",
+    "addContact": "Add Contact",
+    "createChatWith": "Create Chat",
+    "noResults": "No users found",
+    "searchPlaceholder": "Enter username to search..."
+  },
+  "webrtc": {
+    "title": "Video Call",
+    "startCall": "Start Call",
+    "joinCall": "Join Call",
+    "endCall": "End Call",
+    "localOffer": "Local Offer",
+    "remoteAnswer": "Remote Answer",
+    "copyOffer": "Copy Offer",
+    "copyAnswer": "Copy Answer",
+    "pasteAnswer": "Paste Answer Here",
+    "pasteOffer": "Paste Offer Here",
+    "connectionStatus": "Connection Status: {status}",
+    "callStatus": "Call Status: {status}",
+    "states": {
+      "notConnected": "Not connected",
+      "connecting": "Connecting",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "callActive": "Call active",
+      "callInactive": "Call inactive"
+    }
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "yes": "Yes",
+    "no": "No",
+    "retry": "Retry"
+  }
+}

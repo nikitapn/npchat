@@ -1,0 +1,44 @@
+{
+  "app": {
+    "title": "NPChat",
+    "welcome": "Bienvenue sur NPChat",
+    "loading": "Chargement..."
+  },
+  "auth": {
+    "login": "Se connecter",
+    "logout": "Se déconnecter",
+    "register": "S'inscrire",
+    "username": "Nom d'utilisateur",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "loginButton": "Se connecter",
+    "registerButton": "S'inscrire"
+  },
+  "chat": {
+    "title": "Discussions",
+    "newChat": "Nouvelle discussion",
+    "openChat": "Ouvrir la discussion",
+    "leaveChat": "Quitter la discussion",
+    "deleteChat": "Supprimer la discussion",
+    "cancel": "Annuler",
+    "sendMessage": "Envoyer un message",
+    "typeMessage": "Tapez votre message...",
+    "participantCount": "{count, plural, =1 {1 participant} other {# participants}}",
+    "noChats": "Aucune discussion pour le moment. Créez une nouvelle discussion pour commencer !"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "search": "Rechercher des utilisateurs...",
+    "addContact": "Ajouter un contact",
+    "createChatWith": "Créer une discussion"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Annuler",
+    "save": "Sauvegarder",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "loading": "Chargement..."
+  }
+}

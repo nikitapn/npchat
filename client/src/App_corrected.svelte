@@ -8,6 +8,9 @@
 	import { authService } from './lib/rpc/services/auth';
 	import { _ } from './lib/i18n';
 	
+	// Initialize i18n
+	import './lib/i18n';
+	
 	// Subscribe to auth state
 	let authState = $state(authService.authState);
 	authService.subscribe((state) => {
