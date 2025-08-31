@@ -22,6 +22,7 @@
     "vite": "^7.0.4"
   },
   "dependencies": {
+    "shaka-player": "^4.16.0",
     "svelte-i18n": "^4.0.1"
   }
 }

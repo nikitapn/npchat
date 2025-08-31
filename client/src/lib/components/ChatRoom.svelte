@@ -2,6 +2,8 @@
 	import type { ChatId, MessageId, ChatAttachment, ChatAttachmentType } from '../rpc/npchat';
 	import { authService } from '../rpc/services/auth';
 	import { chatService } from '../rpc/services/Chat.svelte';
+	import VideoPlayer from './VideoPlayer.svelte';
+	import { isVideoFile } from '../utils/shakaLoader';
 
 	interface ChatRoomProps {
 		currentChatId: ChatId;
@@ -73,11 +75,23 @@
 	// Utility functions for attachment handling
 	function detectAttachmentType(file: File): ChatAttachmentType {
 		const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-		return imageTypes.includes(file.type) ? 0 : 1; // Picture = 0, File = 1
+		const videoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/mkv'];
+		
+		if (imageTypes.includes(file.type)) {
+			return 0; // Picture
+		} else if (videoTypes.includes(file.type)) {
+			return 2; // Video
+		} else {
+			return 1; // File
+		}
 	}
 
 	function isImageAttachment(attachment: ChatAttachment): boolean {
 		return attachment.type === 0; // Picture
+	}
+
+	function isVideoAttachment(attachment: ChatAttachment): boolean {
+		return attachment.type === 2; // Video
 	}
 
 	function createImageUrl(data: Uint8Array): string {
@@ -288,6 +302,15 @@
 													{message.attachment.name}
 												</div>
 											</div>
+										{:else if isVideoAttachment(message.attachment)}
+											<!-- Video attachment -->
+											<div class="video-attachment">
+												<VideoPlayer 
+													videoData={message.attachment.data} 
+													fileName={message.attachment.name}
+													mimeType="video/mp4"
+												/>
+											</div>
 										{:else}
 											<!-- File attachment -->
 											<div class="flex items-center space-x-2 p-2 rounded {
@@ -352,6 +375,8 @@
 						<div class="text-2xl">
 							{#if detectAttachmentType(selectedFile) === 0}
 								🖼️
+							{:else if detectAttachmentType(selectedFile) === 2}
+								🎥
 							{:else}
 								📎
 							{/if}
@@ -387,7 +412,7 @@
 					type="file"
 					onchange={handleFileSelect}
 					class="hidden"
-					accept="image/*,*"
+					accept="image/*,video/*,*"
 				/>
 
 				<!-- Message input -->

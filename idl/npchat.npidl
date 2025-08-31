@@ -45,7 +45,8 @@ UserData: flat {
 
 enum ChatAttachmentType {
   Picture,
-  File
+  File,
+  Video
 }
 
 ChatAttachment: flat {

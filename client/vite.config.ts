@@ -41,6 +41,10 @@ export default defineConfig({
       }
     }
   ],
+  build: {
+    sourcemap: true, // Enable source maps for production builds
+    minify: false,   // Disable minification for easier debugging (optional)
+  },
   resolve: {
     alias: {
       '@lib': path.resolve(__dirname, 'src/lib'),
