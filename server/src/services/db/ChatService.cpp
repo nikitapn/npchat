@@ -1,7 +1,7 @@
 #include "ChatService.hpp"
 
-ChatService::ChatService(const std::shared_ptr<Database>& database) 
-  : db_(database) 
+ChatService::ChatService(const std::shared_ptr<Database>& database)
+  : db_(database)
 {
   insert_message_stmt_ = db_->prepareStatement(
     "INSERT INTO messages (chat_id, sender_id, content, timestamp, attachment_id) "
