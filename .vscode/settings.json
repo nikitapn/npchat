@@ -1,4 +1,10 @@
 {
+  "search.exclude": {
+    "**/dist": true,
+    "**/build_local": true,
+    "./certs": true,
+    "./external": true,
+  },
   "C_Cpp.default.compileCommands": [
     ".build_local/compile_commands.json"
   ],

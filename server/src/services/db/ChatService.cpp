@@ -57,8 +57,9 @@ ChatService::ChatService(const std::shared_ptr<Database>& database)
 
   get_user_chats_details_stmt_ = db_->prepareStatement(
     "SELECT DISTINCT c.id, c.created_by, c.created_at, "
-    "       (SELECT COUNT(*) FROM chat_participants cp WHERE cp.chat_id = c.id) as participant_count, "
-    "       (SELECT MAX(m.timestamp) FROM messages m WHERE m.chat_id = c.id) as last_message_time "
+  "       (SELECT COUNT(*) FROM chat_participants cp WHERE cp.chat_id = c.id) as participant_count, "
+  "       (SELECT MAX(m.timestamp) FROM messages m WHERE m.chat_id = c.id) as last_message_time, "
+  "       (c.created_by = ?) as can_delete "
     "FROM chats c "
     "JOIN chat_participants cp ON c.id = cp.chat_id "
     "WHERE cp.user_id = ? "
@@ -331,8 +332,9 @@ npchat::ChatList ChatService::getUserChatsWithDetails(std::uint32_t user_id) {
 
   npchat::ChatList chats;
 
+  // Bind user_id for the can_delete computed column (c.created_by = ?) and for the WHERE clause
   sqlite3_bind_int(get_user_chats_details_stmt_, 1, user_id);
-
+  sqlite3_bind_int(get_user_chats_details_stmt_, 2, user_id);
   while (sqlite3_step(get_user_chats_details_stmt_) == SQLITE_ROW) {
     npchat::Chat chat;
     chat.id = sqlite3_column_int(get_user_chats_details_stmt_, 0);
@@ -344,6 +346,9 @@ npchat::ChatList ChatService::getUserChatsWithDetails(std::uint32_t user_id) {
     if (sqlite3_column_type(get_user_chats_details_stmt_, 4) != SQLITE_NULL) {
       chat.lastMessageTime = sqlite3_column_int(get_user_chats_details_stmt_, 4);
     }
+
+  // can_delete computed column (1 or 0) - IDL requires this field, set explicitly
+  chat.canDelete = (sqlite3_column_int(get_user_chats_details_stmt_, 5) != 0);
 
     chats.push_back(std::move(chat));
   }

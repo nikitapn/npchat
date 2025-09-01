@@ -350,18 +350,24 @@
                   <!-- Attachment content -->
                   {#if message.attachment}
                     {#if isImageAttachment(message.attachment)}
-                      <!-- Image attachment -->
-                      <div class="rounded-lg overflow-hidden">
-                        <img
-                          src={createImageUrl(message.attachment.data)}
-                          alt={message.attachment.name}
-                          class="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onclick={() => window.open(createImageUrl(message.attachment!.data), '_blank')}
-                        />
-                        <div class="text-xs mt-1 opacity-75">
-                          {message.attachment!.name}
+                      <!-- Image attachment (accessible) -->
+                        <div class="rounded-lg overflow-hidden">
+                          <button
+                            type="button"
+                            class="p-0 border-0 bg-transparent rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onclick={() => window.open(createImageUrl(message.attachment!.data), '_blank')}
+                            aria-label={"Open image " + message.attachment!.name}
+                          >
+                            <img
+                              src={createImageUrl(message.attachment.data)}
+                              alt={message.attachment.name}
+                              class="max-w-full h-auto rounded-lg block"
+                            />
+                          </button>
+                          <div class="text-xs mt-1 opacity-75">
+                            {message.attachment!.name}
+                          </div>
                         </div>
-                      </div>
                     {:else if isVideoAttachment(message.attachment)}
                       <!-- Video attachment -->
                       <div class="video-attachment">

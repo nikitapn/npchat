@@ -123,6 +123,7 @@ Chat: flat {
   createdBy: UserId;       // ID of user who created the chat
   createdAt: u32;          // Unix timestamp when chat was created
   participantCount: u32;   // Number of participants in the chat
+  canDelete: boolean;      // Whether the current user can delete this chat (creator only)
   lastMessageTime?: u32;   // Timestamp of the most recent message (optional)
 };
 

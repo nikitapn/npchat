@@ -1,8 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
+  interface IceServer {
+    urls: string | string[];
+    username?: string;
+    credential?: string;
+  }
+
   // WebRTC configuration with your STUN server
-  let rtcConfig = $state({
+  let rtcConfig = $state<{iceServers: Array<IceServer>}>({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' }, // Fallback Google STUN
       // Add your VPS STUN server here - replace with your server details
@@ -220,11 +226,12 @@
       {#if showAdvanced}
         <div class="mt-4 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="custom-stun-server" class="block text-sm font-medium text-gray-700 mb-2">
               Add Custom STUN Server (your VPS):
             </label>
             <div class="flex gap-2">
               <input
+                id="custom-stun-server"
                 bind:value={customStunServer}
                 placeholder="your-vps-ip:3478"
                 class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
@@ -239,7 +246,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Current STUN Servers:</label>
+            <p class="block text-sm font-medium text-gray-700 mb-2">Current STUN Servers:</p>
             <div class="text-sm text-gray-600">
               {#each rtcConfig.iceServers as server}
                 <div class="bg-gray-100 p-2 rounded mb-1">{server.urls}</div>
@@ -261,7 +268,9 @@
           muted
           playsinline
           class="w-full h-64 bg-gray-900 rounded-lg object-cover"
-        ></video>
+        >
+          <track kind="captions" srclang="en" label="English captions" src="/captions/empty.vtt" default />
+        </video>
       </div>
 
       <!-- Remote Video -->
@@ -272,7 +281,9 @@
           autoplay
           playsinline
           class="w-full h-64 bg-gray-900 rounded-lg object-cover"
-        ></video>
+        >
+          <track kind="captions" srclang="en" label="English captions" src="/captions/empty.vtt" default />
+        </video>
       </div>
     </div>
 
@@ -328,10 +339,11 @@
         <h3 class="text-lg font-semibold mb-4">Your Offer/Answer</h3>
         {#if localOffer}
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="local-offer-textarea" class="block text-sm font-medium text-gray-700 mb-2">
               Share this offer with the other person:
             </label>
             <textarea
+              id="local-offer-textarea"
               readonly
               value={localOffer}
               class="w-full h-32 p-2 border border-gray-300 rounded text-xs font-mono"
@@ -347,10 +359,11 @@
 
         {#if localAnswerInput}
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="local-answer-textarea" class="block text-sm font-medium text-gray-700 mb-2">
               Share this answer back:
             </label>
             <textarea
+              id="local-answer-textarea"
               readonly
               value={localAnswerInput}
               class="w-full h-32 p-2 border border-gray-300 rounded text-xs font-mono"
@@ -371,10 +384,11 @@
 
         {#if !localOffer}
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="remote-offer-textarea" class="block text-sm font-medium text-gray-700 mb-2">
               Paste the offer here:
             </label>
             <textarea
+              id="remote-offer-textarea"
               bind:value={remoteOfferInput}
               placeholder="Paste the JSON offer here..."
               class="w-full h-32 p-2 border border-gray-300 rounded text-xs font-mono"
@@ -382,10 +396,11 @@
           </div>
         {:else}
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="remote-answer-textarea" class="block text-sm font-medium text-gray-700 mb-2">
               Paste the answer here:
             </label>
             <textarea
+              id="remote-answer-textarea"
               bind:value={remoteAnswer}
               placeholder="Paste the JSON answer here..."
               class="w-full h-32 p-2 border border-gray-300 rounded text-xs font-mono"
