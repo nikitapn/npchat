@@ -10,9 +10,9 @@ class Database {
   sqlite3 *db_;
   std::string dbPath_;
 public:
-  explicit Database(const std::string &path) 
+  explicit Database(const std::string &path)
     : db_(nullptr)
-    , dbPath_(path) 
+    , dbPath_(path)
   {
     if (sqlite3_threadsafe() != 1) {
       // https://www.sqlite.org/c3ref/c_config_covering_index_scan.html#sqliteconfigserialized

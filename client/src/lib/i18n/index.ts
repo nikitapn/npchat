@@ -32,7 +32,7 @@ const getSavedLocale = (): string => {
 // Initialize i18n and return a Promise
 export const initI18n = (): Promise<void> => {
   const initialLocale = getSavedLocale();
-  
+
   return Promise.resolve(init({
     fallbackLocale: defaultLocale,
     initialLocale: initialLocale,

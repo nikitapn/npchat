@@ -20,7 +20,7 @@ export async function loadShaka() {
   }
 
   console.log('Loading Shaka Player...');
-  
+
   // Create the loading promise
   shakaPromise = new Promise((resolve, reject) => {
     // Check if Shaka is already available
@@ -34,13 +34,13 @@ export async function loadShaka() {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.6/shaka-player.compiled.min.js';
     script.async = true;
-    
+
     script.onload = () => {
       if (window.shaka) {
         // Install polyfills and configure Shaka
         try {
           window.shaka.polyfill.installAll();
-          
+
           if (window.shaka.Player.isBrowserSupported()) {
             console.log('Shaka Player loaded and supported');
             isLoaded = true;
@@ -55,11 +55,11 @@ export async function loadShaka() {
         reject(new Error('Shaka Player failed to load'));
       }
     };
-    
+
     script.onerror = () => {
       reject(new Error('Failed to load Shaka Player script'));
     };
-    
+
     document.head.appendChild(script);
   });
 
@@ -78,7 +78,7 @@ export function getShakaPlayer() {
 export function isVideoFile(file: File): boolean {
   const videoTypes = [
     'video/mp4',
-    'video/webm', 
+    'video/webm',
     'video/ogg',
     'video/avi',
     'video/mov',
@@ -108,7 +108,7 @@ export function requiresShaka(mimeType: string, fileName: string): boolean {
   if (mimeType === 'application/dash+xml' || fileName.endsWith('.mpd')) {
     return true;
   }
-  // HLS manifest  
+  // HLS manifest
   if (mimeType === 'application/x-mpegURL' || mimeType === 'application/vnd.apple.mpegurl' || fileName.endsWith('.m3u8')) {
     return true;
   }

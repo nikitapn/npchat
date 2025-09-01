@@ -6,7 +6,7 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
-RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc, 
+RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc,
                                        std::shared_ptr<ContactService> contactService,
                                        std::shared_ptr<MessageService> messageService,
                                        std::shared_ptr<ChatService> chatService,
@@ -25,7 +25,7 @@ RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc,
 // Contact management
 npchat::ContactList RegisteredUserImpl::GetContacts() {
   spdlog::info("GetContacts called for user ID: {}", userId_);
-  
+
   try {
     auto contacts = contactService_->getContacts(userId_);
     spdlog::info("Retrieved {} contacts for user ID: {}", contacts.size(), userId_);
@@ -39,7 +39,7 @@ npchat::ContactList RegisteredUserImpl::GetContacts() {
 npchat::ContactList RegisteredUserImpl::SearchUsers(::nprpc::flat::Span<char> query, std::uint32_t limit) {
   std::string queryStr(query);
   spdlog::info("SearchUsers called for user ID: {}, query: '{}', limit: {}", userId_, queryStr, limit);
-  
+
   try {
     auto users = contactService_->searchUsers(userId_, queryStr, limit);
     spdlog::info("Found {} users for query '{}' by user ID: {}", users.size(), queryStr, userId_);
@@ -52,7 +52,7 @@ npchat::ContactList RegisteredUserImpl::SearchUsers(::nprpc::flat::Span<char> qu
 
 void RegisteredUserImpl::AddContact(npchat::UserId contactUserId) {
   spdlog::info("AddContact called for user ID: {}, adding contact: {}", userId_, contactUserId);
-  
+
   try {
     bool success = contactService_->addContact(userId_, contactUserId);
     if (success) {
@@ -68,7 +68,7 @@ void RegisteredUserImpl::AddContact(npchat::UserId contactUserId) {
 
 void RegisteredUserImpl::RemoveContact(npchat::UserId contactUserId) {
   spdlog::info("RemoveContact called for user ID: {}, removing contact: {}", userId_, contactUserId);
-  
+
   try {
     bool success = contactService_->removeContact(userId_, contactUserId);
     if (success) {
@@ -85,7 +85,7 @@ void RegisteredUserImpl::RemoveContact(npchat::UserId contactUserId) {
 // Chat management
 npchat::ChatList RegisteredUserImpl::GetChats() {
   spdlog::info("GetChats called for user ID: {}", userId_);
-  
+
   try {
     // Use the new method that returns full chat details
     auto chats = chatService_->getUserChatsWithDetails(userId_);
@@ -99,15 +99,15 @@ npchat::ChatList RegisteredUserImpl::GetChats() {
 
 npchat::ChatId RegisteredUserImpl::CreateChat() {
   spdlog::info("CreateChat called for user ID: {}", userId_);
-  
+
   try {
     // Create a chat with just the current user as participant
     std::vector<std::uint32_t> participants = {userId_};
     auto chatId = chatService_->createChat(userId_, participants);
-    
+
     // Register chat participants with the observer system
     chatObservers_->add_chat_participants(chatId, participants);
-    
+
     spdlog::info("Created chat {} for user ID: {}, registered with observers", chatId, userId_);
     return chatId;
   } catch (const std::exception& e) {
@@ -118,16 +118,16 @@ npchat::ChatId RegisteredUserImpl::CreateChat() {
 
 npchat::ChatId RegisteredUserImpl::CreateChatWith(npchat::UserId otherUserId) {
   spdlog::info("CreateChatWith called for user ID: {} with user: {}", userId_, otherUserId);
-  
+
   try {
     // Find existing chat or create a new one
     auto chatId = chatService_->findOrCreateChatBetween(userId_, otherUserId);
-    
+
     // Get the participants to register with observer system
     auto participants = chatService_->getChatParticipants(chatId);
     chatObservers_->add_chat_participants(chatId, participants);
-    
-    spdlog::info("Found/created chat {} between user {} and user {}, registered with observers", 
+
+    spdlog::info("Found/created chat {} between user {} and user {}, registered with observers",
                  chatId, userId_, otherUserId);
     return chatId;
   } catch (const std::exception& e) {
@@ -137,39 +137,39 @@ npchat::ChatId RegisteredUserImpl::CreateChatWith(npchat::UserId otherUserId) {
 }
 
 void RegisteredUserImpl::AddChatParticipant(npchat::ChatId chatId, npchat::UserId participantUserId) {
-  spdlog::info("AddChatParticipant called for user ID: {}, chat: {}, participant: {}", 
+  spdlog::info("AddChatParticipant called for user ID: {}, chat: {}, participant: {}",
                userId_, chatId, participantUserId);
-  
+
   try {
     // TODO: Add method to ChatService to add a single participant
     spdlog::info("Added participant {} to chat {} by user ID: {}", participantUserId, chatId, userId_);
   } catch (const std::exception& e) {
-    spdlog::error("Error adding participant {} to chat {} by user ID {}: {}", 
+    spdlog::error("Error adding participant {} to chat {} by user ID {}: {}",
                   participantUserId, chatId, userId_, e.what());
     throw;
   }
 }
 
 void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::UserId participantUserId) {
-  spdlog::info("LeaveChatParticipant called for user ID: {}, chat: {}, participant: {}", 
+  spdlog::info("LeaveChatParticipant called for user ID: {}, chat: {}, participant: {}",
                userId_, chatId, participantUserId);
-  
+
   try {
     // Use ChatService to remove the participant with proper authorization
     bool success = chatService_->removeParticipant(userId_, chatId, participantUserId);
-    
+
     if (success) {
-      spdlog::info("Successfully removed participant {} from chat {} by user ID: {}", 
+      spdlog::info("Successfully removed participant {} from chat {} by user ID: {}",
                    participantUserId, chatId, userId_);
     } else {
-      spdlog::warn("Failed to remove participant {} from chat {} by user ID: {}", 
+      spdlog::warn("Failed to remove participant {} from chat {} by user ID: {}",
                    participantUserId, chatId, userId_);
     }
   } catch (const std::runtime_error& e) {
     std::string errorMsg = e.what();
-    spdlog::error("Error removing participant {} from chat {} by user ID {}: {}", 
+    spdlog::error("Error removing participant {} from chat {} by user ID {}: {}",
                   participantUserId, chatId, userId_, errorMsg);
-    
+
     // Convert runtime errors to proper NPRPC exceptions
     if (errorMsg.find("not a participant") != std::string::npos) {
       throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
@@ -181,7 +181,7 @@ void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::Use
       throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
     }
   } catch (const std::exception& e) {
-    spdlog::error("Unexpected error removing participant {} from chat {} by user ID {}: {}", 
+    spdlog::error("Unexpected error removing participant {} from chat {} by user ID {}: {}",
                   participantUserId, chatId, userId_, e.what());
     throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
   }
@@ -190,15 +190,15 @@ void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::Use
 // Message operations
 void RegisteredUserImpl::SubscribeToEvents(nprpc::Object* obj) {
   spdlog::info("SubscribeToEvents called for user ID: {}", userId_);
-  
+
   try {
     if (auto listener = nprpc::narrow<npchat::ChatListener>(obj)) {
       listener->add_ref();
       listener->set_timeout(250);
-      
+
       // Subscribe this user's listener to chat events
       chatObservers_->subscribe_user(userId_, listener);
-      
+
       spdlog::info("Successfully subscribed user ID: {} to chat events", userId_);
     } else {
       spdlog::error("Failed to narrow object to ChatListener for user ID: {}", userId_);
@@ -210,32 +210,32 @@ void RegisteredUserImpl::SubscribeToEvents(nprpc::Object* obj) {
   }
 }
 
-npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId, 
+npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
                                                   npchat::flat::ChatMessage_Direct message) {
   spdlog::info("SendMessage called for user ID: {}, chat ID: {}", userId_, chatId);
-  
+
   try {
     // Convert flat message to regular ChatMessage for ChatService
     npchat::ChatMessage chatMessage;
     npchat::helpers::assign_from_flat_ChatMessage(message, chatMessage);
     chatMessage.chatId = chatId;
-    
+
     auto messageId = chatService_->sendMessage(userId_, chatId, chatMessage);
-    
+
     // Notify all chat participants about the new message
     chatObservers_->notify_message_received(messageId, chatMessage, userId_);
-    
+
     // Notify sender about successful delivery
     chatObservers_->notify_message_delivered(chatId, messageId, userId_);
-    
-    spdlog::info("Message sent with ID: {} for user ID: {}, chat ID: {}, participants notified", 
+
+    spdlog::info("Message sent with ID: {} for user ID: {}, chat ID: {}, participants notified",
                  messageId, userId_, chatId);
     return messageId;
   } catch (const std::runtime_error& e) {
     std::string errorMsg = e.what();
-    spdlog::error("Error sending message for user ID {}, chat ID {}: {}", 
+    spdlog::error("Error sending message for user ID {}, chat ID {}: {}",
                   userId_, chatId, errorMsg);
-    
+
     // Convert runtime_error to proper NPRPC exception
     if (errorMsg.find("not a participant") != std::string::npos) {
       throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
@@ -245,27 +245,27 @@ npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
       throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
     }
   } catch (const std::exception& e) {
-    spdlog::error("Unexpected error sending message for user ID {}, chat ID {}: {}", 
+    spdlog::error("Unexpected error sending message for user ID {}, chat ID {}: {}",
                   userId_, chatId, e.what());
     throw npchat::ChatOperationFailed(npchat::ChatError::InvalidMessage);
   }
 }
 
 npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) {
-  spdlog::info("GetChatHistory called for user ID: {}, chat ID: {}, limit: {}, offset: {}", 
+  spdlog::info("GetChatHistory called for user ID: {}, chat ID: {}, limit: {}, offset: {}",
                userId_, chatId, limit, offset);
-  
+
   try {
     // First, verify that the user is a participant in this chat
     auto participants = chatService_->getChatParticipants(chatId);
     bool isParticipant = std::find(participants.begin(), participants.end(), userId_) != participants.end();
-    
+
     if (!isParticipant) {
-      spdlog::warn("User {} attempted to access chat history for chat {} without being a participant", 
+      spdlog::warn("User {} attempted to access chat history for chat {} without being a participant",
                    userId_, chatId);
       throw npchat::ChatOperationFailed(npchat::ChatError::UserNotParticipant);
     }
-    
+
     auto messages = chatService_->getMessages(chatId, limit, offset);
     spdlog::info("Retrieved {} messages for chat {} by user ID: {}", messages.size(), chatId, userId_);
     return messages;
@@ -273,7 +273,7 @@ npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, st
     // Re-throw NPRPC exceptions as-is
     throw;
   } catch (const std::exception& e) {
-    spdlog::error("Error getting chat history for user ID {}, chat ID {}: {}", 
+    spdlog::error("Error getting chat history for user ID {}, chat ID {}: {}",
                   userId_, chatId, e.what());
     throw npchat::ChatOperationFailed(npchat::ChatError::ChatNotFound);
   }
@@ -281,7 +281,7 @@ npchat::MessageList RegisteredUserImpl::GetChatHistory(npchat::ChatId chatId, st
 
 std::uint32_t RegisteredUserImpl::GetUnreadMessageCount() {
   spdlog::info("GetUnreadMessageCount called for user ID: {}", userId_);
-  
+
   try {
     auto count = messageService_->getUnreadMessageCount(userId_);
     spdlog::info("User ID: {} has {} unread messages", userId_, count);
@@ -294,7 +294,7 @@ std::uint32_t RegisteredUserImpl::GetUnreadMessageCount() {
 
 void RegisteredUserImpl::MarkMessageAsRead(npchat::MessageId messageId) {
   spdlog::info("MarkMessageAsRead called for user ID: {}, message ID: {}", userId_, messageId);
-  
+
   try {
     messageService_->markMessageAsRead(messageId, userId_);
     spdlog::info("Marked message {} as read for user ID: {}", messageId, userId_);

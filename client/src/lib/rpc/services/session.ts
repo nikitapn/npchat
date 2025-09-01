@@ -14,7 +14,7 @@ interface SessionManager {
 class SecureSessionManager implements SessionManager {
   private readonly SESSION_COOKIE = 'npchat_session_secure';
   private readonly CSRF_TOKEN_KEY = 'npchat_csrf_token';
-  
+
   // Generate CSRF token for additional security
   private generateCSRFToken(): string {
     const array = new Uint8Array(32);
@@ -26,13 +26,13 @@ class SecureSessionManager implements SessionManager {
     try {
       // Set HTTP-only cookie via server endpoint in production
       // For now, use secure client-side cookies with additional protections
-      
+
       const csrfToken = this.generateCSRFToken();
-      
+
       // Set session cookie with security flags
       const expires = new Date();
       expires.setTime(expires.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
-      
+
       const cookieOptions = [
         `${this.SESSION_COOKIE}=${sessionId}`,
         `expires=${expires.toUTCString()}`,
@@ -40,12 +40,12 @@ class SecureSessionManager implements SessionManager {
         `SameSite=Strict`,
         location.protocol === 'https:' ? 'Secure' : ''
       ].filter(Boolean).join(';');
-      
+
       document.cookie = cookieOptions;
-      
-      // Store CSRF token separately  
+
+      // Store CSRF token separately
       sessionStorage.setItem(this.CSRF_TOKEN_KEY, csrfToken);
-      
+
       // Store non-sensitive user data
       localStorage.setItem('npchat_userdata', JSON.stringify({
         name: userData.name,
@@ -62,18 +62,18 @@ class SecureSessionManager implements SessionManager {
   clearSecureSession(): void {
     // Clear session cookie
     document.cookie = `${this.SESSION_COOKIE}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
-    
+
     // Clear related storage
     sessionStorage.removeItem(this.CSRF_TOKEN_KEY);
     localStorage.removeItem('npchat_userdata');
-    
+
     console.log('Secure session cleared');
   }
 
   getSessionFromSecureCookie(): string | null {
     const nameEQ = this.SESSION_COOKIE + "=";
     const ca = document.cookie.split(';');
-    
+
     for (let i = 0; i < ca.length; i++) {
       let c = ca[i];
       while (c.charAt(0) === ' ') c = c.substring(1, c.length);
@@ -88,11 +88,11 @@ class SecureSessionManager implements SessionManager {
     const sessionId = this.getSessionFromSecureCookie();
     const csrfToken = sessionStorage.getItem(this.CSRF_TOKEN_KEY);
     const userData = localStorage.getItem('npchat_userdata');
-    
+
     if (!sessionId || !csrfToken) {
       return false;
     }
-    
+
     // Validate CSRF token matches
     try {
       if (userData) {
@@ -102,7 +102,7 @@ class SecureSessionManager implements SessionManager {
           this.clearSecureSession();
           return false;
         }
-        
+
         // Check session age (optional - could add server-side validation)
         const lastLogin = parsedData.lastLogin;
         const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -117,7 +117,7 @@ class SecureSessionManager implements SessionManager {
       this.clearSecureSession();
       return false;
     }
-    
+
     return true;
   }
 

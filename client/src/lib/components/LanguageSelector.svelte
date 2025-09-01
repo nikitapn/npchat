@@ -85,7 +85,7 @@
   </button>
 
   {#if showDropdown}
-    <div 
+    <div
       class="absolute right-0 z-50 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg"
       role="menu"
       tabindex="-1"

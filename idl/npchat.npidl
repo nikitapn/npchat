@@ -81,9 +81,9 @@ using ChatList = vector<Chat>;
 using MessageList = vector<ChatMessage>;
 
 interface ChatListener {
-  void OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
-  void OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
-  void OnContactListUpdated(contacts: in ContactList);
+  async OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
+  async OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
+  async OnContactListUpdated(contacts: in ContactList);
 }
 
 [trusted=false]
@@ -93,14 +93,14 @@ interface RegisteredUser {
   ContactList SearchUsers(query: in string, limit: in u32);
   void AddContact(userId: in UserId);
   void RemoveContact(userId: in UserId);
-  
-  // Chat management  
+
+  // Chat management
   ChatList GetChats();
   ChatId CreateChat();
   ChatId CreateChatWith(userId: in UserId);
   void AddChatParticipant(chatId: in ChatId, userId: in UserId);
   void LeaveChatParticipant(chatId: in ChatId, userId: in UserId);
-  
+
   // Message operations
   void SubscribeToEvents(listener: in object /* ChatListener */);
   MessageId SendMessage(chatId: in ChatId, message: in ChatMessage)

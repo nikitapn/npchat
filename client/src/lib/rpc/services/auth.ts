@@ -75,11 +75,11 @@ export class AuthService {
   // Wait for RPC to be available with timeout
   private async waitForRPC(timeoutMs: number = 5000): Promise<boolean> {
     const startTime = Date.now();
-    
+
     while (!this.isRPCAvailable() && (Date.now() - startTime) < timeoutMs) {
       await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
     }
-    
+
     return this.isRPCAvailable();
   }
 
@@ -121,7 +121,7 @@ export class AuthService {
 
     // Sanitize inputs for security
     const sanitizedLogin = SecurityUtils.sanitizeInput(login);
-    
+
     if (!sanitizedLogin || !password) {
       throw new Error('Login and password are required');
     }
@@ -185,7 +185,7 @@ export class AuthService {
         user: null,
         sessionId: null
       });
-      
+
       if (error instanceof AuthorizationFailed) {
         throw new Error('Session expired or invalid');
       }
@@ -197,13 +197,13 @@ export class AuthService {
     if (this.isRPCAvailable() && this._authState.sessionId) {
       try {
         const success = await authorizator.LogOut(this._authState.sessionId);
-        
+
         this.updateAuthState({
           isAuthenticated: false,
           user: null,
           sessionId: null
         });
-        
+
         this.clearSessionFromCookies();
         return success;
       } catch (error) {
@@ -224,7 +224,7 @@ export class AuthService {
         user: null,
         sessionId: null
       });
-      
+
       this.clearSessionFromCookies();
       return true;
     }
@@ -254,11 +254,11 @@ export class AuthService {
     // Sanitize and validate inputs
     const sanitizedUsername = SecurityUtils.sanitizeInput(username);
     const sanitizedEmail = SecurityUtils.sanitizeInput(email);
-    
+
     if (!sanitizedUsername || !sanitizedEmail || !password) {
       throw new Error('Username, email, and password are required');
     }
-    
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(sanitizedEmail)) {
@@ -292,7 +292,7 @@ export class AuthService {
 
     // Sanitize and validate inputs
     const sanitizedUsername = SecurityUtils.sanitizeInput(username);
-    
+
     if (!sanitizedUsername || !code || code < 0 || code > 999999) {
       throw new Error('Valid username and verification code are required');
     }
@@ -364,7 +364,7 @@ export class AuthService {
     if (!this._authState.isAuthenticated) {
       throw new Error('User is not authenticated');
     }
-    
+
     // For now, return a hardcoded user ID until we implement proper user ID storage
     // In a real app, this would be stored during login or retrieved from the server
     return 1;

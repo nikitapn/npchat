@@ -118,9 +118,9 @@ int main(int argc, char *argv[]) {
 
     // static poa
     auto poa = nprpc::PoaBuilder(rpc)
-		  .with_max_objects(4)
-		  .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
-		  .build();
+      .with_max_objects(4)
+      .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+      .build();
 
     auto authorizator = injector2.create<std::shared_ptr<AuthorizatorImpl>>();
 
