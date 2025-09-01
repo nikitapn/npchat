@@ -1,136 +1,317 @@
+// NPChat Interface Definition Language (IDL)
+// ==========================================
+// This file defines the complete RPC interface for the NPChat application,
+// a real-time messaging system built with NPRPC framework.
+//
+// Key Features:
+// - Real-time messaging with push notifications
+// - Contact management and user discovery
+// - Chat creation and participant management
+// - Message history with pagination
+// - File attachments (images, videos, documents)
+// - User authentication and registration
+//
+// Architecture:
+// - Uses NPRPC for type-safe, efficient binary communication
+// - Supports both synchronous and asynchronous operations
+// - Implements proper error handling with typed exceptions
+// - Provides real-time event notifications via ChatListener interface
+//
+// Generated Code:
+// This IDL file is processed by the NPRPC IDL compiler to generate:
+// - C++ server-side stubs and skeletons
+// - TypeScript client-side proxy classes
+// - JavaScript bindings for web applications
+
 namespace npchat {
 
-using bytestream = vector<u8>;
+using bytestream = vector<u8>;  // Binary data container for file attachments and images
 
-using UserId = u32;
-using ChatId = u32;
-using MessageId = u32;
+// ===== BASIC TYPE DEFINITIONS =====
+// Core identifier types used throughout the system
+using UserId = u32;     // Unique identifier for users
+using ChatId = u32;     // Unique identifier for chats/conversations
+using MessageId = u32;  // Unique identifier for individual messages
 
+// ===== ERROR TYPES =====
+
+// Authentication error codes
 enum AuthorizationError {
-  InvalidCredentials = 0,
-  AccessDenied = 1,
+  InvalidCredentials = 0,  // Username/email or password is incorrect
+  AccessDenied = 1,        // User doesn't have permission for the requested operation
 };
 
+// Exception thrown when authentication fails
 AuthorizationFailed: exception {
-  reason: AuthorizationError;
-}
+  reason: AuthorizationError;  // Specific reason for authentication failure
+};
 
+// User registration error codes
 enum RegistrationError: u8 {
-  UsernameAlreadyTaken,
-  EmailAlreadyTaken,
-  InvorrectCode,
-  InvalidUsername,
-}
+  UsernameAlreadyTaken,    // The requested username is already in use
+  EmailAlreadyTaken,       // The email address is already registered
+  InvorrectCode,           // The verification code is incorrect
+  InvalidUsername,         // Username doesn't meet requirements (length, format, etc.)
+};
 
+// Exception thrown when user registration fails
 RegistrationFailed: exception {
-  reason: RegistrationError;
-}
+  reason: RegistrationError;  // Specific reason for registration failure
+};
 
+// Chat operation error codes
 enum ChatError: u8 {
-  ChatNotFound,
-  UserNotParticipant,
-  MessageTooLong,
-  InvalidMessage,
-}
+  ChatNotFound,           // The specified chat doesn't exist
+  UserNotParticipant,     // User is not a participant in the chat
+  MessageTooLong,         // Message content exceeds maximum allowed length
+  InvalidMessage,         // Message format or content is invalid
+};
 
+// Exception thrown when chat operations fail
 ChatOperationFailed: exception {
-  reason: ChatError;
-}
+  reason: ChatError;      // Specific reason for chat operation failure
+};
 
+// ===== DATA STRUCTURES =====
+
+// User session data returned after successful authentication
 UserData: flat {
-  name: string;
-  sessionId: string;
-  registeredUser: object; // RegisteredUser
-}
+  name: string;           // User's display name/username
+  sessionId: string;      // Session identifier for subsequent requests
+  registeredUser: object; // RPC object for accessing user-specific operations
+};
 
+// Supported attachment types for chat messages
 enum ChatAttachmentType {
-  Picture,
-  File,
-  Video
-}
+  Picture,  // Image files (JPEG, PNG, GIF, etc.)
+  File,     // Generic file attachments
+  Video     // Video files (MP4, AVI, etc.)
+};
 
+// Binary attachment data for chat messages
 ChatAttachment: flat {
-  type: ChatAttachmentType;
-  name: string;
-  data: bytestream;
-}
+  type: ChatAttachmentType;  // Type of attachment
+  name: string;             // Original filename
+  data: bytestream;         // Binary content of the attachment
+};
 
+// Chat message with optional attachment
 ChatMessage: flat {
-  chatId: ChatId;
-  timestamp: u32;
-  str: string;
-  attachment?: ChatAttachment;
-}
+  chatId: ChatId;          // ID of the chat this message belongs to
+  timestamp: u32;          // Unix timestamp when message was sent
+  str: string;             // Text content of the message
+  attachment?: ChatAttachment;  // Optional file attachment
+};
 
+// User contact information
 Contact: flat {
-  id: UserId;
-  username: string;
-  avatar?: bytestream;
-}
+  id: UserId;              // Unique user identifier
+  username: string;        // User's display name
+  avatar?: bytestream;     // Optional profile picture data
+};
 
+// Chat metadata
 Chat: flat {
-  id: ChatId;
-  createdBy: UserId;
-  createdAt: u32;
-  participantCount: u32;
-  lastMessageTime?: u32;
-}
+  id: ChatId;              // Unique chat identifier
+  createdBy: UserId;       // ID of user who created the chat
+  createdAt: u32;          // Unix timestamp when chat was created
+  participantCount: u32;   // Number of participants in the chat
+  lastMessageTime?: u32;   // Timestamp of the most recent message (optional)
+};
 
-using ContactList = vector<Contact>;
-using ChatList = vector<Chat>;
-using MessageList = vector<ChatMessage>;
+// ===== TYPE ALIASES =====
+
+// Collection type aliases for cleaner interface definitions
+using ContactList = vector<Contact>;     // List of user contacts
+using ChatList = vector<Chat>;           // List of user chats
+using MessageList = vector<ChatMessage>; // List of chat messages
 
 interface ChatListener {
+  // Called when a new message is received in any chat the user is participating in
+  // Parameters:
+  //   - messageId: Unique identifier for the message
+  //   - message: The complete message data including chatId, timestamp, content, and optional attachment
   async OnMessageReceived(messageId: in MessageId, message: in ChatMessage);
+
+  // Called when a message has been successfully delivered to all participants
+  // Parameters:
+  //   - chatId: The chat where the message was delivered
+  //   - messageId: Unique identifier of the delivered message
   async OnMessageDelivered(chatId: in ChatId, messageId: in MessageId);
+
+  // Called when the user's contact list is updated (contacts added/removed)
+  // Parameters:
+  //   - contacts: Updated list of all user contacts
   async OnContactListUpdated(contacts: in ContactList);
 }
 
 [trusted=false]
 interface RegisteredUser {
-  // Contact management
+  // ===== CONTACT MANAGEMENT =====
+
+  // Retrieves the complete list of contacts for the authenticated user
+  // Returns: List of contacts with their IDs, usernames, and optional avatars
+  // Note: Only returns contacts that have been explicitly added by the user
   ContactList GetContacts();
+
+  // Searches for users by username or email to potentially add as contacts
+  // Parameters:
+  //   - query: Search string (username or email)
+  //   - limit: Maximum number of results to return (for pagination)
+  // Returns: List of matching users that can be added as contacts
+  // Note: Excludes users who are already contacts or the current user
   ContactList SearchUsers(query: in string, limit: in u32);
+
+  // Adds a user to the current user's contact list
+  // Parameters:
+  //   - userId: ID of the user to add as a contact
+  // Note: Both users must exist, and the target user must not already be a contact
   void AddContact(userId: in UserId);
+
+  // Removes a user from the current user's contact list
+  // Parameters:
+  //   - userId: ID of the contact to remove
+  // Note: Only removes the contact relationship, doesn't delete the user account
   void RemoveContact(userId: in UserId);
 
-  // Chat management
+  // ===== CHAT MANAGEMENT =====
+
+  // Retrieves all chats that the user is currently participating in
+  // Returns: List of chats with metadata including participant count and last message time
+  // Note: Only includes chats where the user is an active participant
   ChatList GetChats();
+
+  // Creates a new empty chat with only the current user as participant
+  // Returns: Unique ID of the newly created chat
+  // Note: Useful for creating group chats that will have participants added later
   ChatId CreateChat();
+
+  // Creates a new private chat between the current user and another user
+  // Parameters:
+  //   - otherUserId: ID of the user to create a chat with
+  // Returns: Chat ID (either newly created or existing chat between these users)
+  // Note: If a private chat already exists between these users, returns the existing chat ID
   ChatId CreateChatWith(userId: in UserId);
+
+  // Adds a participant to an existing chat
+  // Parameters:
+  //   - chatId: ID of the chat to add the participant to
+  //   - participantUserId: ID of the user to add as a participant
+  // Note: Only the chat creator can add participants. The user must exist and not already be a participant.
   void AddChatParticipant(chatId: in ChatId, userId: in UserId);
+
+  // Removes a participant from a chat (including the current user leaving)
+  // Parameters:
+  //   - chatId: ID of the chat to remove the participant from
+  //   - participantUserId: ID of the participant to remove
+  // Note: Only the chat creator can remove other participants. Users can remove themselves.
+  //       If the last participant leaves, the chat is automatically deleted.
   void LeaveChatParticipant(chatId: in ChatId, userId: in UserId);
 
-  // Message operations
+  // ===== MESSAGE OPERATIONS =====
+
+  // Subscribes to real-time chat events for all chats the user participates in
+  // Parameters:
+  //   - listener: ChatListener object that will receive event callbacks
+  // Note: This enables push notifications for new messages, deliveries, and contact updates
   void SubscribeToEvents(listener: in object /* ChatListener */);
+
+  // Sends a message to a specific chat
+  // Parameters:
+  //   - chatId: ID of the chat to send the message to
+  //   - message: Complete message data including content and optional attachment
+  // Returns: Unique ID of the sent message
+  // Raises: ChatOperationFailed if user is not a participant or message is invalid
   MessageId SendMessage(chatId: in ChatId, message: in ChatMessage)
     raises(ChatOperationFailed);
+
+  // Retrieves message history for a specific chat with pagination support
+  // Parameters:
+  //   - chatId: ID of the chat to get history for
+  //   - limit: Maximum number of messages to return
+  //   - offset: Number of messages to skip (for pagination)
+  // Returns: List of messages in chronological order (oldest first)
+  // Note: User must be a participant in the chat. Messages are ordered by timestamp.
   MessageList GetChatHistory(chatId: in ChatId, limit: in u32, offset: in u32);
+
+  // Gets the total count of unread messages across all chats
+  // Returns: Number of messages that haven't been marked as read
+  // Note: Only counts messages in chats where the user is a participant
   u32 GetUnreadMessageCount();
+
+  // Marks a specific message as read
+  // Parameters:
+  //   - messageId: ID of the message to mark as read
+  // Note: Only the message recipient can mark messages as read
   void MarkMessageAsRead(messageId: in MessageId);
 }
 
 
 [trusted=false]
 interface Authorizator {
+  // ===== AUTHENTICATION =====
+
+  // Authenticates a user with username/email and password
+  // Parameters:
+  //   - login: Username or email address
+  //   - password: User's password
+  // Returns: User data including session information and registered user object
+  // Raises: AuthorizationFailed if credentials are invalid
+  // Note: Creates a new session that can be used for subsequent requests
   UserData LogIn(login: in string, password: in string)
     raises(AuthorizationFailed);
+
+  // Authenticates a user using an existing session ID
+  // Parameters:
+  //   - session_id: Valid session identifier from a previous login
+  // Returns: User data for the authenticated session
+  // Raises: AuthorizationFailed if session is invalid or expired
+  // Note: Useful for maintaining user sessions across page reloads or app restarts
   UserData LogInWithSessionId(session_id: in string)
     raises(AuthorizationFailed);
+
+  // Logs out a user and invalidates their session
+  // Parameters:
+  //   - session_id: Session to invalidate
+  // Returns: True if logout was successful, false otherwise
+  // Note: After logout, the session ID becomes invalid for future requests
   boolean LogOut(session_id: in string);
 
+  // ===== USERNAME/EMAIL VALIDATION =====
+
+  // Checks if a username is available for registration
+  // Parameters:
+  //   - username: Desired username to check
+  // Returns: True if username is available, false if already taken
+  // Note: Used during registration to provide real-time feedback
   boolean CheckUsername(username: in string);
+
+  // Checks if an email address is available for registration
+  // Parameters:
+  //   - email: Email address to check
+  // Returns: True if email is available, false if already registered
+  // Note: Used during registration to provide real-time feedback
   boolean CheckEmail(email: in string);
 
-  /**
-    * Registers a new user in two steps:
-    * 1. RegisterStepOne: registers the user with username, email, and password.
-    * 2. RegisterStepTwo: completes the registration with a verification code.
-    */
+  // ===== USER REGISTRATION =====
+
+  // Initiates user registration process (first step)
+  // Parameters:
+  //   - username: Desired username (must be unique)
+  //   - email: User's email address (must be unique)
+  //   - password: User's password (will be hashed before storage)
+  // Raises: RegistrationFailed if username/email already exists or invalid
+  // Note: This creates a pending registration that must be completed with RegisterStepTwo
   void RegisterStepOne(username: in string, email: in string, password: in string)
     raises(RegistrationFailed);
+
+  // Completes user registration with verification code (second step)
+  // Parameters:
+  //   - username: Username from RegisterStepOne
+  //   - code: Verification code sent to the user's email
+  // Raises: RegistrationFailed if code is invalid or registration has expired
+  // Note: After successful completion, the user can log in with their credentials
   void RegisterStepTwo(username: in string, code: in u32)
     raises(RegistrationFailed);
 }
-
-}
+} // namespace npchat
