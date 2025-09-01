@@ -2,15 +2,20 @@
 
 set -e
 
-source .env
+source common.shi
 
-cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build .build_local
+if [[ -z "$1" || "$1" == "run" ]]; then
+    cmake --build $BUILD_DIR
+elif [ "$1" == "server" ]; then
+    cmake --build $BUILD_DIR --target npchat
+elif [ "$1" == "client" ]; then
+    cmake --build $BUILD_DIR --target npchat_js
+fi
 
 [ ! "$1" == "run" ] && exit 0
 
 CMD=(
-    .build_local/${BUILD_TYPE}/npchat
+    ${BUILD_DIR}/bin/npchat
     --hostname archvm.lan
     --http-dir ./client/dist
     --data-dir ./sample_data

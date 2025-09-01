@@ -41,10 +41,19 @@ This is a **hybrid C++/Svelte WebRTC chat application** with a comprehensive rea
 
 ### Building the Application
 ```bash
-# Full build script (Frontend + Backend)
+# Configure the build system (run once)
+./configure.sh
+
+# Build everything (Frontend + Backend) -- default
 ./build.sh
 
-# Or to start Backend server automatically after build
+# Build only the server target (skip client/Vite step)
+./build.sh server
+
+# Build only the generated client JS target (Vite/TS output)
+./build.sh client
+
+# Build and start the backend server (runs the server after build)
 ./build.sh run
 
 # Frontend development server (optimized build system)

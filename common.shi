@@ -1,0 +1,6 @@
+#!/bin/env bash
+
+source .env
+
+BUILD_DIR=.build_local/${BUILD_TYPE:-Debug}
+BUILD_TYPE=${BUILD_TYPE:-Debug}

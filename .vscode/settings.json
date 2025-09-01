@@ -6,9 +6,10 @@
     "./external": true,
   },
   "C_Cpp.default.compileCommands": [
-    ".build_local/compile_commands.json"
+    ".build_local/Debug/compile_commands.json"
   ],
   "files.associations": {
+    ".shi": "shellscript",
     ".args": "gn",
     "chrono": "cpp",
     "optional": "cpp",

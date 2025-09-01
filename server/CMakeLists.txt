@@ -13,10 +13,13 @@ add_executable(npchat
 
   src/services/db/Database.hpp
   src/services/db/AuthService.hpp
+  src/services/db/AuthService.cpp
   src/services/db/ChatService.hpp
   src/services/db/ChatService.cpp
   src/services/db/ContactService.hpp
+  src/services/db/ContactService.cpp
   src/services/db/MessageService.hpp
+  src/services/db/MessageService.cpp
 
   src/services/rpc/Authorizator.hpp
   src/services/rpc/Authorizator.cpp
