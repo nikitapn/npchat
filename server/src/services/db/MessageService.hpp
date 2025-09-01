@@ -305,7 +305,7 @@ private:
     npchat::ChatMessage msg;
     msg.chatId = sqlite3_column_int(stmt, 1);
     msg.timestamp = sqlite3_column_int64(stmt, 4);
-    msg.str = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+    msg.content.text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
 
     // Handle attachment if present
     if (sqlite3_column_type(stmt, 5) != SQLITE_NULL) {
@@ -320,7 +320,7 @@ private:
         static_cast<const std::uint8_t*>(blob_data) + blob_size
       );
 
-      msg.attachment = attachment;
+      msg.content.attachment = attachment;
     }
 
     return msg;

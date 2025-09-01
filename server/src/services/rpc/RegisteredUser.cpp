@@ -211,18 +211,23 @@ void RegisteredUserImpl::SubscribeToEvents(nprpc::Object* obj) {
 }
 
 npchat::MessageId RegisteredUserImpl::SendMessage(npchat::ChatId chatId,
-                                                  npchat::flat::ChatMessage_Direct message) {
+                                                  npchat::flat::ChatMessageContent_Direct content) {
   spdlog::info("SendMessage called for user ID: {}, chat ID: {}", userId_, chatId);
 
   try {
     // Convert flat message to regular ChatMessage for ChatService
-    npchat::ChatMessage chatMessage;
-    npchat::helpers::assign_from_flat_ChatMessage(message, chatMessage);
-    chatMessage.chatId = chatId;
+    npchat::ChatMessageContent messageContent;
+    npchat::helpers::assign_from_flat_ChatMessageContent(content, messageContent);
 
-    auto messageId = chatService_->sendMessage(userId_, chatId, chatMessage);
+    auto messageId = chatService_->sendMessage(userId_, chatId, messageContent);
 
     // Notify all chat participants about the new message
+    npchat::ChatMessage chatMessage {
+      .messageId = messageId,
+      .senderId = userId_,
+      .chatId = chatId,
+      .content = std::move(messageContent)
+    };
     chatObservers_->notify_message_received(messageId, chatMessage, userId_);
 
     // Notify sender about successful delivery

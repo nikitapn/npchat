@@ -14,6 +14,7 @@ add_executable(npchat
   src/services/db/Database.hpp
   src/services/db/AuthService.hpp
   src/services/db/ChatService.hpp
+  src/services/db/ChatService.cpp
   src/services/db/ContactService.hpp
   src/services/db/MessageService.hpp
 

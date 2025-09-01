@@ -150,7 +150,7 @@
     try {
       const currentUserId = authService.getCurrentUserId();
 
-      await registeredUser.DeleteChat(chatId, currentUserId);
+      await registeredUser.LeaveChatParticipant(chatId, currentUserId);
       console.log('Deleted chat:', chatId);
 
       // Refresh chat list

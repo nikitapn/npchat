@@ -14,7 +14,7 @@
 
   // Subscribe to locale changes
   $effect(() => {
-    const unsubscribe = locale.subscribe((value: string | null) => {
+    const unsubscribe = locale.subscribe((value: string | null | undefined) => {
       currentLocale = value || 'en';
     });
     return unsubscribe;

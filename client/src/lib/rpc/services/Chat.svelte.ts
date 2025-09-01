@@ -1,4 +1,4 @@
-import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList, ChatAttachment } from '../npchat';
+import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList, ChatAttachment, ChatMessageContent } from '../npchat';
 import { _IChatListener_Servant } from '../npchat';
 import { poa } from '../index';
 import { authService } from './auth';
@@ -108,10 +108,8 @@ class ChatServiceImpl {
       throw new Error('Chat service not initialized');
     }
 
-    const chatMessage: ChatMessage = {
-      chatId: chatId,
-      timestamp: Date.now(),
-      str: text.trim(),
+    const chatMessage: ChatMessageContent = {
+      text: text.trim(),
       attachment: attachment
     };
 
@@ -217,7 +215,7 @@ class ChatServiceImpl {
     if (history) {
       // Check if message already exists (avoid duplicates)
       const exists = history.messages.some(m =>
-        m.timestamp === message.timestamp && m.str === message.str
+        m.timestamp === message.timestamp && m.content.text === message.content.text
       );
 
       if (!exists) {

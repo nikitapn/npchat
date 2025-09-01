@@ -19,7 +19,7 @@
   });
 
   // Handle chat selection
-  function selectChat(chatId: ChatId) {
+  function selectChat(chatId: ChatId | null) {
     currentChatId = chatId;
     selectedView = 'chats';
     // Notify global chat service about active chat

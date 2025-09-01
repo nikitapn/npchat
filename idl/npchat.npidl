@@ -91,16 +91,23 @@ enum ChatAttachmentType {
 // Binary attachment data for chat messages
 ChatAttachment: flat {
   type: ChatAttachmentType;  // Type of attachment
-  name: string;             // Original filename
-  data: bytestream;         // Binary content of the attachment
+  name: string;              // Original filename
+  data: bytestream;          // Binary content of the attachment
+};
+
+// Content of a chat message, including optional attachment
+ChatMessageContent: flat {
+  text: string;                 // Text content of the message
+  attachment?: ChatAttachment;  // Optional file attachment
 };
 
 // Chat message with optional attachment
 ChatMessage: flat {
-  chatId: ChatId;          // ID of the chat this message belongs to
-  timestamp: u32;          // Unix timestamp when message was sent
-  str: string;             // Text content of the message
-  attachment?: ChatAttachment;  // Optional file attachment
+  messageId: MessageId;        // Unique identifier for the message
+  senderId: UserId;            // ID of the user who sent the message
+  chatId: ChatId;              // ID of the chat this message belongs to
+  timestamp: u32;              // Unix timestamp when message was sent
+  content: ChatMessageContent; // Message content including text and optional attachment
 };
 
 // User contact information
@@ -219,10 +226,10 @@ interface RegisteredUser {
   // Sends a message to a specific chat
   // Parameters:
   //   - chatId: ID of the chat to send the message to
-  //   - message: Complete message data including content and optional attachment
+  //   - content: Complete message content including text and optional attachment
   // Returns: Unique ID of the sent message
   // Raises: ChatOperationFailed if user is not a participant or message is invalid
-  MessageId SendMessage(chatId: in ChatId, message: in ChatMessage)
+  MessageId SendMessage(chatId: in ChatId, content: in ChatMessageContent)
     raises(ChatOperationFailed);
 
   // Retrieves message history for a specific chat with pagination support

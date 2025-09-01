@@ -39,7 +39,7 @@ public:
   // Message operations
   virtual void SubscribeToEvents(nprpc::Object* listener) override;
   virtual npchat::MessageId SendMessage(npchat::ChatId chatId,
-                                        npchat::flat::ChatMessage_Direct message) override;
+                                        npchat::flat::ChatMessageContent_Direct content) override;
   virtual npchat::MessageList GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) override;
   virtual std::uint32_t GetUnreadMessageCount() override;
   virtual void MarkMessageAsRead(npchat::MessageId messageId) override;

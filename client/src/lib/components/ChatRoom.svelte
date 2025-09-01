@@ -61,7 +61,7 @@
         groups.push(currentGroup);
       } else {
         // Add to existing group
-        currentGroup.messages.push(message);
+        currentGroup!.messages.push(message);
       }
     }
 
@@ -159,10 +159,10 @@
     const chatMessages = chatService.getMessagesForChat(currentChatId);
     messages = chatMessages.map(message => ({
       id: message.timestamp, // Use timestamp as temp ID if no messageId available
-      text: message.str,
+      text: message.content.text,
       timestamp: new Date(message.timestamp),
       sender: 'Other User', // TODO: Get actual sender name from user ID
-      attachment: message.attachment
+      attachment: message.content.attachment
     }));
   }
 
@@ -356,10 +356,10 @@
                           src={createImageUrl(message.attachment.data)}
                           alt={message.attachment.name}
                           class="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onclick={() => window.open(createImageUrl(message.attachment.data), '_blank')}
+                          onclick={() => window.open(createImageUrl(message.attachment!.data), '_blank')}
                         />
                         <div class="text-xs mt-1 opacity-75">
-                          {message.attachment.name}
+                          {message.attachment!.name}
                         </div>
                       </div>
                     {:else if isVideoAttachment(message.attachment)}
@@ -396,11 +396,11 @@
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }"
                           onclick={() => {
-                            const blob = new Blob([message.attachment.data]);
+                            const blob = new Blob([message.attachment!.data]);
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = message.attachment.name;
+                            a.download = message.attachment!.name;
                             a.click();
                             URL.revokeObjectURL(url);
                           }}
