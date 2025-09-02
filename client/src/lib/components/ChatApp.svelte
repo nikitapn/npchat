@@ -50,7 +50,7 @@
   }
 </script>
 
-<div class="min-h-screen bg-gray-50">
+<div class="h-screen bg-gray-50">
   <!-- Header -->
   <div class="bg-white shadow-sm border-b border-gray-200 p-4">
     <div class="max-w-7xl mx-auto flex justify-between items-center">
@@ -70,9 +70,9 @@
   </div>
 
   <div class="max-w-7xl mx-auto p-4">
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <!-- Sidebar -->
-      <div class="lg:col-span-1 h-screen flex flex-col space-y-4">
+      <div class="lg:col-span-1 flex flex-col space-y-4">
         <!-- Navigation Tabs -->
         <div class="bg-white rounded-lg shadow p-2">
           <div class="flex space-x-1">
@@ -107,7 +107,7 @@
         </div>
 
         <!-- Content based on selected view -->
-        <div class="flex-1 min-h-0">
+        <div class="flex-1">
           {#if selectedView === 'chats'}
             <ChatList
               {registeredUser}
@@ -125,7 +125,7 @@
       </div>
 
       <!-- Main Chat Area -->
-      <div class="lg:col-span-3 h-screen">
+      <div class="lg:col-span-3 h-[calc(100vh-110px)]">
         {#if currentChatId}
           <ChatRoom currentChatId={currentChatId} />
         {:else}

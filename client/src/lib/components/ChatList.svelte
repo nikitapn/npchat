@@ -199,7 +199,7 @@
   }
 </script>
 
-<div class="bg-white rounded-lg shadow h-full flex flex-col">
+<div class="bg-white rounded-lg shadow flex flex-col h-[calc(100vh-178px)]">
   <div class="flex justify-between items-center p-4 border-b border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900">{$_('chat.title')}</h3>
     <button
