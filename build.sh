@@ -5,11 +5,11 @@ set -e
 source common.shi
 
 if [[ -z "$1" || "$1" == "run" ]]; then
-    cmake --build $BUILD_DIR
+    cmake --build $BUILD_DIR -j$(nproc)
 elif [ "$1" == "server" ]; then
-    cmake --build $BUILD_DIR --target npchat
+    cmake --build $BUILD_DIR --target npchat -j$(nproc)
 elif [ "$1" == "client" ]; then
-    cmake --build $BUILD_DIR --target npchat_js
+    cmake --build $BUILD_DIR --target npchat_js -j$(nproc)
 fi
 
 [ ! "$1" == "run" ] && exit 0

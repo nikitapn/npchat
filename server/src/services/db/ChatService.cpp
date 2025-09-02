@@ -199,26 +199,26 @@ std::vector<npchat::ChatMessage> ChatService::getMessages(npchat::ChatId chat_id
 
   while (sqlite3_step(get_messages_stmt_) == SQLITE_ROW) {
     npchat::ChatMessage msg;
-    msg.messageId = sqlite3_column_int(get_messages_stmt_, 1);
-    msg.chatId = sqlite3_column_int(get_messages_stmt_, 2);
-    msg.senderId = sqlite3_column_int(get_messages_stmt_, 3);
+    msg.messageId = sqlite3_column_int(get_messages_stmt_, 0);
+    msg.chatId = sqlite3_column_int(get_messages_stmt_, 1);
+    msg.senderId = sqlite3_column_int(get_messages_stmt_, 2);
     // Safely handle text content
-    const char* content_text = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 4));
+    const char* content_text = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 3));
     msg.content.text = content_text ? content_text : "";
-    msg.timestamp = sqlite3_column_int64(get_messages_stmt_, 5);
+    msg.timestamp = sqlite3_column_int64(get_messages_stmt_, 4);
 
     // Handle attachment if present
-    if (sqlite3_column_type(get_messages_stmt_, 6) != SQLITE_NULL) {
+    if (sqlite3_column_type(get_messages_stmt_, 5) != SQLITE_NULL) {
       npchat::ChatAttachment attachment;
-      attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_messages_stmt_, 7));
+      attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_messages_stmt_, 6));
 
       // Safely handle attachment name
-      const char* attachment_name = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 8));
+      const char* attachment_name = reinterpret_cast<const char*>(sqlite3_column_text(get_messages_stmt_, 7));
       attachment.name = attachment_name ? attachment_name : "";
 
       // Safely handle blob data
-      const void* blob_data = sqlite3_column_blob(get_messages_stmt_, 9);
-      int blob_size = sqlite3_column_bytes(get_messages_stmt_, 9);
+      const void* blob_data = sqlite3_column_blob(get_messages_stmt_, 8);
+      int blob_size = sqlite3_column_bytes(get_messages_stmt_, 8);
       if (blob_data && blob_size > 0) {
         attachment.data.assign(
           static_cast<const std::uint8_t*>(blob_data),
@@ -227,8 +227,6 @@ std::vector<npchat::ChatMessage> ChatService::getMessages(npchat::ChatId chat_id
       }
 
       msg.content.attachment = attachment;
-
-      spdlog::debug("Message has attachment size = {}", attachment.data.size());
     }
 
     messages.push_back(std::move(msg));
@@ -245,12 +243,13 @@ std::optional<npchat::ChatMessage> ChatService::getMessageById(npchat::MessageId
 
   if (sqlite3_step(get_message_by_id_stmt_) == SQLITE_ROW) {
     npchat::ChatMessage msg;
+    msg.messageId = sqlite3_column_int(get_message_by_id_stmt_, 0);
     msg.chatId = sqlite3_column_int(get_message_by_id_stmt_, 1);
-    msg.timestamp = sqlite3_column_int64(get_message_by_id_stmt_, 4);
     msg.content.text = reinterpret_cast<const char*>(sqlite3_column_text(get_message_by_id_stmt_, 3));
+    msg.timestamp = sqlite3_column_int64(get_message_by_id_stmt_, 4);
 
     // Handle attachment if present
-    if (sqlite3_column_type(get_message_by_id_stmt_, 5) != SQLITE_NULL) {
+    if (sqlite3_column_type(get_message_by_id_stmt_, 6) != SQLITE_NULL) {
       npchat::ChatAttachment attachment;
       attachment.type = static_cast<npchat::ChatAttachmentType>(sqlite3_column_int(get_message_by_id_stmt_, 7));
       attachment.name = reinterpret_cast<const char*>(sqlite3_column_text(get_message_by_id_stmt_, 8));
@@ -347,8 +346,8 @@ npchat::ChatList ChatService::getUserChatsWithDetails(std::uint32_t user_id) {
       chat.lastMessageTime = sqlite3_column_int(get_user_chats_details_stmt_, 4);
     }
 
-  // can_delete computed column (1 or 0) - IDL requires this field, set explicitly
-  chat.canDelete = (sqlite3_column_int(get_user_chats_details_stmt_, 5) != 0);
+    // can_delete computed column (1 or 0) - IDL requires this field, set explicitly
+    chat.canDelete = (sqlite3_column_int(get_user_chats_details_stmt_, 5) != 0);
 
     chats.push_back(std::move(chat));
   }
