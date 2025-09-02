@@ -425,10 +425,8 @@ bool ChatService::removeParticipant(std::uint32_t requesting_user_id, npchat::Ch
       participants.erase(std::remove(participants.begin(), participants.end(), participant_id), participants.end());
 
       // If no participants left, delete the entire chat
-      if (participants.empty()) {
+      if (participants.empty())
         deleteChat(chat_id);
-        chat_participants_cache_.erase(it);
-      }
     }
   }
 

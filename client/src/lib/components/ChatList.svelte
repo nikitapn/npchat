@@ -22,6 +22,8 @@
     chatId: null as ChatId | null
   });
 
+  $inspect(chats);
+
   // Get context menu items for a chat
   function getContextMenuItems(chat: Chat): ContextMenuItem[] {
     return [
@@ -71,7 +73,7 @@
     try {
       const chatList = await registeredUser.GetChats();
       chats = chatList;
-      console.log('Loaded chats:', chats);
+      // console.log('Loaded chats:', chats);
     } catch (error) {
       console.error('Failed to load chats:', error);
     }

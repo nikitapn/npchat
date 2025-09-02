@@ -15,6 +15,8 @@
   let isSearching = $state(false);
   let showAddContact = $state(false);
 
+  $inspect(contacts);
+
   // Load contacts when component initializes
   async function loadContacts() {
     if (!registeredUser) return;
@@ -22,7 +24,7 @@
     try {
       const contactList = await registeredUser.GetContacts();
       contacts = contactList;
-      console.log('Loaded contacts:', contacts);
+      // console.log('Loaded contacts:', contacts);
     } catch (error) {
       console.error('Failed to load contacts:', error);
     }

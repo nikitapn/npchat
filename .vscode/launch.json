@@ -1,0 +1,33 @@
+{
+  "configurations": [
+  {
+    "name": "(gdb) Launch Server",
+    "type": "cppdbg",
+    "request": "launch",
+    "program": "${workspaceFolder}/.build_local/Debug/bin/npchat",
+    "args": [
+      "--hostname", "archvm.lan",
+      "--http-dir", "./client/dist",
+      "--data-dir", "./sample_data",
+      "--trace"
+    ],
+    "stopAtEntry": false,
+    "cwd": "${workspaceFolder}",
+    "environment": [],
+    "externalConsole": false,
+    "MIMode": "gdb",
+    "setupCommands": [
+        {
+            "description": "Enable pretty-printing for gdb",
+            "text": "-enable-pretty-printing",
+            "ignoreFailures": true
+        },
+        {
+            "description": "Set Disassembly Flavor to Intel",
+            "text": "-gdb-set disassembly-flavor intel",
+            "ignoreFailures": true
+        }
+    ]
+  }
+  ]
+}
