@@ -226,6 +226,27 @@ class ChatServiceImpl {
     // Add to global notifications
     this.notifications.push(notification);
 
+    // If message is from a different chat than the one currently open, show a browser notification
+    if (this.activeChatId !== null && message.chatId !== this.activeChatId) {
+      try {
+        if ("Notification" in window) {
+          // Request permission once
+          if (Notification.permission === "default") {
+            Notification.requestPermission().then(() => {
+              // no-op
+            });
+          }
+          if (Notification.permission === "granted") {
+            const title = `New message in chat ${message.chatId}`;
+            const body = message.content.text || "New message received";
+            new Notification(title, { body });
+          }
+        }
+      } catch {
+        // Ignore notification errors (e.g., in SSR or restricted contexts)
+      }
+    }
+
     // Add to chat history if it's loaded
     const history = this.chatHistories.get(message.chatId);
     if (history) {

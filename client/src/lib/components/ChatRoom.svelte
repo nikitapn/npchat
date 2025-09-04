@@ -58,12 +58,17 @@
   async function requestMediaPermissions() {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { facingMode: 'user' },
         audio: true
       });
-      if (localVideo) {
-        localVideo.srcObject = localStream;
-      }
+      // Attach after element is bound
+      queueMicrotask(() => {
+        if (localVideo && localStream) {
+          localVideo.srcObject = localStream;
+          // Some browsers require an explicit play()
+          localVideo.play().catch(() => {/* ignore autoplay restrictions */});
+        }
+      });
       callStatus = 'Media ready - Click "Start Call"';
     } catch (error) {
       console.error('Error accessing media devices:', error);
@@ -85,9 +90,12 @@
     // Handle remote stream
     peerConnection.ontrack = (event) => {
       remoteStream = event.streams[0];
-      if (remoteVideo) {
-        remoteVideo.srcObject = remoteStream;
-      }
+      queueMicrotask(() => {
+        if (remoteVideo && remoteStream) {
+          remoteVideo.srcObject = remoteStream;
+          remoteVideo.play().catch(() => {/* may be blocked until user gesture */});
+        }
+      });
     };
 
     // Handle ICE candidates (trickling ICE)
@@ -116,6 +124,7 @@
     peerConnection.onconnectionstatechange = () => {
       callStatus = `Connection: ${peerConnection?.connectionState}`;
       if (peerConnection?.connectionState === 'connected') {
+        // Connected; update flags without blocking UI with alert dialogs
         isCallActive = true;
         isCallConnecting = false;
       }
@@ -343,7 +352,8 @@
   }
 
   function createImageUrl(data: Uint8Array): string {
-    const blob = new Blob([data], { type: 'image/jpeg' }); // Assume JPEG for now
+    // Cast ArrayBufferLike -> ArrayBuffer to satisfy TS lib definitions
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'image/jpeg' }); // Assume JPEG for now
     return URL.createObjectURL(blob);
   }
 
@@ -353,6 +363,24 @@
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Helpers for safe attachment actions
+  function openImage(att?: ChatAttachment) {
+    if (!att) return;
+    const url = createImageUrl(att.data);
+    window.open(url, '_blank');
+  }
+
+  function downloadAttachment(att?: ChatAttachment) {
+    if (!att) return;
+    const blob = new Blob([att.data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = att.name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // File handling functions
@@ -608,6 +636,23 @@
       // Don't set activeChatId to null here - let the parent component handle it
     };
   });
+
+  // Ensure video elements get streams once modal is visible
+  $effect(() => {
+    if (showCallModal) {
+      if (localVideo && localStream) {
+        localVideo.srcObject = localStream;
+        // Best-effort play; may be blocked without gesture, but Start/Answer are gestures
+        // @ts-ignore - play exists on HTMLMediaElement
+        localVideo.play?.().catch(() => {});
+      }
+      if (remoteVideo && remoteStream) {
+        remoteVideo.srcObject = remoteStream;
+        // @ts-ignore
+        remoteVideo.play?.().catch(() => {});
+      }
+    }
+  });
 </script>
 
 <div class="h-full bg-white rounded-lg shadow flex flex-col">
@@ -681,8 +726,8 @@
                           <button
                             type="button"
                             class="p-0 border-0 bg-transparent rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            onclick={() => window.open(createImageUrl(message.attachment!.data), '_blank')}
-                            aria-label={"Open image " + message.attachment!.name}
+                            onclick={() => openImage(message.attachment)}
+                            aria-label={"Open image " + (message.attachment?.name || '')}
                           >
                             <img
                               src={createImageUrl(message.attachment.data)}
@@ -691,7 +736,7 @@
                             />
                           </button>
                           <div class="text-xs mt-1 opacity-75">
-                            {message.attachment!.name}
+                            {message.attachment.name}
                           </div>
                         </div>
                     {:else if isVideoAttachment(message.attachment)}
@@ -727,15 +772,7 @@
                               ? 'bg-blue-700 text-white hover:bg-blue-800'
                               : 'bg-blue-600 text-white hover:bg-blue-700'
                           }"
-                          onclick={() => {
-                            const blob = new Blob([message.attachment!.data]);
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = message.attachment!.name;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
+                          onclick={() => downloadAttachment(message.attachment)}
                         >
                           Download
                         </button>
@@ -837,6 +874,7 @@
           <button
             onclick={endCall}
             class="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close video call"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -860,7 +898,9 @@
                 muted
                 playsinline
                 class="w-full h-64 bg-gray-900 rounded-lg object-cover"
-              ></video>
+              >
+                <track kind="captions" label="Local video" />
+              </video>
               <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                 You
               </div>
@@ -873,7 +913,9 @@
                 autoplay
                 playsinline
                 class="w-full h-64 bg-gray-900 rounded-lg object-cover"
-              ></video>
+              >
+                <track kind="captions" label="Remote video" />
+              </video>
               <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                 Remote
               </div>

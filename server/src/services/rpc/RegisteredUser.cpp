@@ -202,6 +202,8 @@ void RegisteredUserImpl::LeaveChatParticipant(npchat::ChatId chatId, npchat::Use
     if (success) {
       spdlog::info("Successfully removed participant {} from chat {} by user ID: {}",
                    participantUserId, chatId, userId_);
+      // Also update observers mapping so future notifications respect current participants
+      chatObservers_->remove_chat_participant(chatId, participantUserId);
     } else {
       spdlog::warn("Failed to remove participant {} from chat {} by user ID: {}",
                    participantUserId, chatId, userId_);
@@ -239,6 +241,20 @@ void RegisteredUserImpl::SubscribeToEvents(nprpc::Object* obj) {
 
       // Subscribe this user's listener to chat events
       chatObservers_->subscribe_user(userId_, listener);
+
+      // Prime observer with all existing chats and their participants so
+      // messages from existing chats are delivered even if the chat wasn't just created.
+      try {
+        auto chats = chatService_->getUserChatsWithDetails(userId_);
+        for (const auto& chat : chats) {
+          // Fetch participants for each chat and register them in the observer mapping
+          auto participants = chatService_->getChatParticipants(chat.id);
+          chatObservers_->add_chat_participants(chat.id, participants);
+        }
+        spdlog::info("Registered {} existing chats for user {} in observers", chats.size(), userId_);
+      } catch (const std::exception& e) {
+        spdlog::warn("Failed to pre-register existing chats for user {}: {}", userId_, e.what());
+      }
 
       spdlog::info("Successfully subscribed user ID: {} to chat events", userId_);
     } else {

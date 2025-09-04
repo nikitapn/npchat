@@ -15,6 +15,7 @@
   let { registeredUser, currentChatId, onSelectChat, onCreateNewChat }: ChatListProps = $props();
 
   let chats: Chat[] = $state([]);
+  let unreadCounts = $state(new Map<ChatId, number>());
   let contextMenu = $state({
     visible: false,
     x: 0,
@@ -99,6 +100,11 @@
 
   // Subscribe to chat updates for real-time unread counts
   const unsubscribe = chatService.onChatUpdate((chatId, update) => {
+    // Store/update unread count
+    unreadCounts.set(chatId, update.unreadCount);
+    // Avoid creating a new Map on every update; only replace when value changed
+    unreadCounts = unreadCounts;
+
     // Refresh chat list to show new chats that may have been created
     if (!chats.find(c => c.id === chatId)) {
       loadChats();
@@ -116,6 +122,15 @@
   $effect(() => {
     return unsubscribe;
   });
+
+  // When switching chats, the unread reset is handled by chatService.setActiveChatId
+  // (called from ChatRoom when a chat becomes active). Avoid doing it here to prevent loops.
+  // $effect(() => {
+  //   if (currentChatId !== null) {
+  //     unreadCounts.set(currentChatId, 0);
+  //     unreadCounts = new Map(unreadCounts);
+  //   }
+  // });
 
   // Handle create new chat click
   function handleCreateNewChat() {
@@ -215,7 +230,7 @@
   <div class="flex-1 overflow-y-auto p-4">
     <div class="space-y-2">
     {#each chats as chat}
-      {@const unreadCount = chatService.getUnreadCount(chat.id)}
+      {@const unreadCount = unreadCounts.get(chat.id) ?? chatService.getUnreadCount(chat.id)}
       <button
         class="w-full flex justify-between items-center p-3 rounded-lg transition-colors select-none {
           currentChatId === chat.id
