@@ -24,6 +24,7 @@
 #include "services/db/ContactService.hpp"
 #include "services/db/MessageService.hpp"
 #include "services/db/ChatService.hpp"
+#include "services/db/WebRTCService.hpp"
 
 #include "services/rpc/Authorizator.hpp"
 #include "services/client/ChatObserver.hpp"
@@ -106,6 +107,7 @@ int main(int argc, char *argv[]) {
     auto messageService = injector.create<std::shared_ptr<MessageService>>();
     auto chatService = injector.create<std::shared_ptr<ChatService>>();
     auto chatObservers = std::make_shared<ChatObservers>();
+    auto webrtcService = std::make_shared<WebRTCService>();
 
     auto injector2 = di::make_injector(
       firstInjector(),
@@ -113,7 +115,8 @@ int main(int argc, char *argv[]) {
       di::bind<>().to(contactService),
       di::bind<>().to(messageService),
       di::bind<>().to(chatService),
-      di::bind<>().to(chatObservers)
+      di::bind<>().to(chatObservers),
+      di::bind<>().to(webrtcService)
     );
 
     // static poa

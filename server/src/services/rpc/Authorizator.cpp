@@ -11,13 +11,15 @@ AuthorizatorImpl::AuthorizatorImpl(nprpc::Rpc& rpc,
                                    std::shared_ptr<ContactService> contactService,
                                    std::shared_ptr<MessageService> messageService,
                                    std::shared_ptr<ChatService> chatService,
-                                   std::shared_ptr<ChatObservers> chatObservers)
+                                   std::shared_ptr<ChatObservers> chatObservers,
+                                   std::shared_ptr<WebRTCService> webrtcService)
   : rpc_(rpc)
   , authService_(authService)
   , contactService_(contactService)
   , messageService_(messageService)
   , chatService_(chatService)
   , chatObservers_(chatObservers)
+  , webrtcService_(webrtcService)
 {
   // Create POA for user objects (RegisteredUser instances)
   user_poa_ = nprpc::PoaBuilder(&rpc)
@@ -34,7 +36,8 @@ npchat::UserData AuthorizatorImpl::LogIn (::nprpc::flat::Span<char> login, ::npr
 
   // Create a new RegisteredUser object
   auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_,
-                                               chatService_, chatObservers_, authService_, userId);
+                                               chatService_, chatObservers_, authService_,
+                                               webrtcService_, userId);
 
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser,
@@ -56,7 +59,8 @@ npchat::UserData AuthorizatorImpl::LogInWithSessionId (::nprpc::flat::Span<char>
 
   // Create a new RegisteredUser object
   auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_,
-                                               chatService_, chatObservers_, authService_, userId);
+                                               chatService_, chatObservers_, authService_,
+                                               webrtcService_, userId);
 
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser,

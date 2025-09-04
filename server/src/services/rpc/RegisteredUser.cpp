@@ -13,6 +13,7 @@ RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc,
                                        std::shared_ptr<ChatService> chatService,
                                        std::shared_ptr<ChatObservers> chatObservers,
                                        std::shared_ptr<AuthService> authService,
+                                       std::shared_ptr<WebRTCService> webrtcService,
                                        std::uint32_t userId)
   : rpc_(rpc)
   , contactService_(contactService)
@@ -20,6 +21,7 @@ RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc,
   , chatService_(chatService)
   , chatObservers_(chatObservers)
   , authService_(authService)
+  , webrtcService_(webrtcService)
   , userId_(userId)
 {
   spdlog::info("RegisteredUser created for user ID: {}", userId_);
@@ -344,6 +346,164 @@ void RegisteredUserImpl::MarkMessageAsRead(npchat::MessageId messageId) {
     spdlog::info("Marked message {} as read for user ID: {}", messageId, userId_);
   } catch (const std::exception& e) {
     spdlog::error("Error marking message {} as read for user ID {}: {}", messageId, userId_, e.what());
+    throw;
+  }
+}
+
+// WebRTC video calling
+std::string RegisteredUserImpl::InitiateCall(npchat::ChatId chatId, ::nprpc::flat::Span<char> offer) {
+  spdlog::info("InitiateCall called for user ID: {}, chat ID: {}", userId_, chatId);
+
+  try {
+    // Check if user is a participant in the chat
+    auto chatParticipants = chatService_->getChatParticipants(chatId);
+    bool isParticipant = std::find(chatParticipants.begin(), chatParticipants.end(), userId_) != chatParticipants.end();
+
+    if (!isParticipant) {
+      spdlog::error("User {} is not a participant in chat {}", userId_, chatId);
+      throw npchat::ChatOperationFailed{npchat::ChatError::UserNotParticipant};
+    }
+
+    // Find the other participant (assuming 1-on-1 chat for now)
+    npchat::UserId otherUserId = 0;
+    for (auto participantId : chatParticipants) {
+      if (participantId != userId_) {
+        otherUserId = participantId;
+        break;
+      }
+    }
+
+    if (otherUserId == 0) {
+      spdlog::error("Could not find other participant in chat {}", chatId);
+      throw npchat::ChatOperationFailed{npchat::ChatError::ChatNotFound};
+    }
+
+    // Check if there's already an active call in this chat
+    auto activeCalls = webrtcService_->getActiveCallsForChat(chatId);
+    if (!activeCalls.empty()) {
+      spdlog::error("Call already active in chat {}", chatId);
+      throw npchat::ChatOperationFailed{npchat::ChatError::InvalidMessage};
+    }
+
+    std::string callId = webrtcService_->initiateCall(chatId, userId_, otherUserId, offer);
+
+    // Notify all chat participants about the call initiation
+    chatObservers_->notify_call_initiated(callId, chatId, userId_, otherUserId, offer);
+
+    spdlog::info("Call initiated: {} in chat {} from {} to {}", callId, chatId, userId_, otherUserId);
+    return callId;
+  } catch (const std::exception& e) {
+    spdlog::error("Error initiating call for user ID {} in chat {}: {}", userId_, chatId, e.what());
+    throw;
+  }
+}
+
+void RegisteredUserImpl::AnswerCall(::nprpc::flat::Span<char> callId, ::nprpc::flat::Span<char> answer) {
+  auto callIdStr = (std::string_view)callId;
+  auto answerStr = (std::string_view)answer;
+
+  spdlog::info("AnswerCall called for user ID: {}, call ID: {}", userId_, callIdStr);
+
+  try {
+    auto callOpt = webrtcService_->getCall(callIdStr);
+    if (!callOpt) {
+      spdlog::error("Call not found: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::ChatNotFound};
+    }
+
+    const auto& call = *callOpt;
+
+    // Verify that this user is the callee
+    if (call.calleeId != userId_) {
+      spdlog::error("User {} is not authorized to answer call {}", userId_, callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::UserNotParticipant};
+    }
+
+    if (!webrtcService_->answerCall(callIdStr, answerStr)) {
+      spdlog::error("Failed to answer call: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::InvalidMessage};
+    }
+
+    // Notify the caller about the answer
+    chatObservers_->notify_call_answered(callIdStr, answerStr, call.callerId);
+
+    spdlog::info("Call answered: {}", callIdStr);
+  } catch (const std::exception& e) {
+    spdlog::error("Error answering call {} for user ID {}: {}", callIdStr, userId_, e.what());
+    throw;
+  }
+}
+
+void RegisteredUserImpl::SendIceCandidate(::nprpc::flat::Span<char> callId, ::nprpc::flat::Span<char> candidate) {
+  auto callIdStr = (std::string_view)callId;
+  auto candidateStr = (std::string_view)candidate;
+
+  spdlog::info("SendIceCandidate called for user ID: {}, call ID: {}", userId_, callIdStr);
+
+  try {
+    auto callOpt = webrtcService_->getCall(callIdStr);
+    if (!callOpt) {
+      spdlog::error("Call not found: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::ChatNotFound};
+    }
+
+    const auto& call = *callOpt;
+
+    // Verify that this user is a participant in the call
+    if (call.callerId != userId_ && call.calleeId != userId_) {
+      spdlog::error("User {} is not a participant in call {}", userId_, callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::UserNotParticipant};
+    }
+
+    if (!webrtcService_->addIceCandidate(callIdStr, candidateStr)) {
+      spdlog::error("Failed to add ICE candidate to call: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::InvalidMessage};
+    }
+
+    // Determine the target user (the other participant)
+    npchat::UserId targetUserId = (call.callerId == userId_) ? call.calleeId : call.callerId;
+
+    // Notify the other participant about the ICE candidate
+    chatObservers_->notify_ice_candidate(callIdStr, candidateStr, targetUserId);
+
+    spdlog::info("ICE candidate sent for call: {}", callIdStr);
+  } catch (const std::exception& e) {
+    spdlog::error("Error sending ICE candidate for call {} by user ID {}: {}", callIdStr, userId_, e.what());
+    throw;
+  }
+}
+
+void RegisteredUserImpl::EndCall(::nprpc::flat::Span<char> callId) {
+  auto callIdStr = (std::string_view)callId;
+
+  spdlog::info("EndCall called for user ID: {}, call ID: {}", userId_, callIdStr);
+
+  try {
+    auto callOpt = webrtcService_->getCall(callIdStr);
+    if (!callOpt) {
+      spdlog::error("Call not found: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::ChatNotFound};
+    }
+
+    const auto& call = *callOpt;
+
+    // Verify that this user is a participant in the call
+    if (call.callerId != userId_ && call.calleeId != userId_) {
+      spdlog::error("User {} is not a participant in call {}", userId_, callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::UserNotParticipant};
+    }
+
+    if (!webrtcService_->endCall(callIdStr)) {
+      spdlog::error("Failed to end call: {}", callIdStr);
+      throw npchat::ChatOperationFailed{npchat::ChatError::InvalidMessage};
+    }
+
+    // Notify all participants about the call ending
+    chatObservers_->notify_call_ended(callIdStr, "ended", call.chatId);
+
+    spdlog::info("Call ended: {}", callIdStr);
+  } catch (const std::exception& e) {
+    spdlog::error("Error ending call {} by user ID {}: {}", callIdStr, userId_, e.what());
     throw;
   }
 }

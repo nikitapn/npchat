@@ -152,6 +152,32 @@ interface ChatListener {
   // Parameters:
   //   - contacts: Updated list of all user contacts
   async OnContactListUpdated(contacts: in ContactList);
+
+  // Called when a video call is initiated in a chat the user participates in
+  // Parameters:
+  //   - callId: Unique identifier for the call
+  //   - chatId: ID of the chat where the call was initiated
+  //   - callerId: ID of the user who initiated the call
+  //   - offer: WebRTC offer SDP
+  async OnCallInitiated(callId: in string, chatId: in ChatId, callerId: in UserId, offer: in string);
+
+  // Called when a call is answered
+  // Parameters:
+  //   - callId: ID of the call that was answered
+  //   - answer: WebRTC answer SDP
+  async OnCallAnswered(callId: in string, answer: in string);
+
+  // Called when an ICE candidate is received for a call
+  // Parameters:
+  //   - callId: ID of the call
+  //   - candidate: ICE candidate data
+  async OnIceCandidate(callId: in string, candidate: in string);
+
+  // Called when a call ends
+  // Parameters:
+  //   - callId: ID of the call that ended
+  //   - reason: Reason for call ending (e.g., "ended", "declined", "error")
+  async OnCallEnded(callId: in string, reason: in string);
 }
 
 [trusted=false]
@@ -265,6 +291,40 @@ interface RegisteredUser {
   //   - messageId: ID of the message to mark as read
   // Note: Only the message recipient can mark messages as read
   void MarkMessageAsRead(messageId: in MessageId);
+
+  // ===== WEBRTC VIDEO CALLING =====
+
+  // Initiates a video call in a specific chat
+  // Parameters:
+  //   - chatId: ID of the chat where the call should be initiated
+  //   - offer: WebRTC offer SDP from the caller
+  // Returns: Call ID for the initiated call
+  // Raises: ChatOperationFailed if user is not a participant or call already active
+  string InitiateCall(chatId: in ChatId, offer: in string)
+    raises(ChatOperationFailed);
+
+  // Answers an incoming call
+  // Parameters:
+  //   - callId: ID of the call to answer
+  //   - answer: WebRTC answer SDP
+  // Raises: ChatOperationFailed if call not found or invalid
+  void AnswerCall(callId: in string, answer: in string)
+    raises(ChatOperationFailed);
+
+  // Sends ICE candidates for a call
+  // Parameters:
+  //   - callId: ID of the call
+  //   - candidate: ICE candidate data
+  // Raises: ChatOperationFailed if call not found
+  void SendIceCandidate(callId: in string, candidate: in string)
+    raises(ChatOperationFailed);
+
+  // Ends an active call
+  // Parameters:
+  //   - callId: ID of the call to end
+  // Raises: ChatOperationFailed if call not found
+  void EndCall(callId: in string)
+    raises(ChatOperationFailed);
 }
 
 

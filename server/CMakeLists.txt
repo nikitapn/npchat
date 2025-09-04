@@ -20,6 +20,8 @@ add_executable(npchat
   src/services/db/ContactService.cpp
   src/services/db/MessageService.hpp
   src/services/db/MessageService.cpp
+  src/services/db/WebRTCService.hpp
+  src/services/db/WebRTCService.cpp
 
   src/services/rpc/Authorizator.hpp
   src/services/rpc/Authorizator.cpp

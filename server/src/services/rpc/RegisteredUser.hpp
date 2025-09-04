@@ -1,6 +1,7 @@
 #pragma once
 
 #include "npchat_stub/npchat.hpp"
+#include "services/db/WebRTCService.hpp"
 
 class ContactService;
 class MessageService;
@@ -15,6 +16,7 @@ class RegisteredUserImpl : public npchat::IRegisteredUser_Servant {
   std::shared_ptr<ChatService> chatService_;
   std::shared_ptr<ChatObservers> chatObservers_;
   std::shared_ptr<AuthService> authService_;
+  std::shared_ptr<WebRTCService> webrtcService_;
   std::uint32_t userId_;
 
 public:
@@ -24,6 +26,7 @@ public:
                      std::shared_ptr<ChatService> chatService,
                      std::shared_ptr<ChatObservers> chatObservers,
                      std::shared_ptr<AuthService> authService,
+                     std::shared_ptr<WebRTCService> webrtcService,
                      std::uint32_t userId);
 
   // Contact management
@@ -52,4 +55,11 @@ public:
   virtual npchat::MessageList GetChatHistory(npchat::ChatId chatId, std::uint32_t limit, std::uint32_t offset) override;
   virtual std::uint32_t GetUnreadMessageCount() override;
   virtual void MarkMessageAsRead(npchat::MessageId messageId) override;
+
+  // WebRTC video calling
+
+  virtual std::string InitiateCall (npchat::ChatId chatId, ::nprpc::flat::Span<char> offer) override;
+  virtual void AnswerCall (::nprpc::flat::Span<char> callId, ::nprpc::flat::Span<char> answer) override;
+  virtual void SendIceCandidate (::nprpc::flat::Span<char> callId, ::nprpc::flat::Span<char> candidate) override;
+  virtual void EndCall (::nprpc::flat::Span<char> callId) override;
 };

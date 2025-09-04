@@ -53,6 +53,12 @@ class ChatServiceImpl {
   // Local cache of contacts
   private contacts = new Map<UserId, Contact>();
 
+  // WebRTC event callbacks
+  private onCallInitiatedCallbacks = new Set<(callId: string, chatId: ChatId, callerId: UserId, offer: string) => void>();
+  private onCallAnsweredCallbacks = new Set<(callId: string, answer: string) => void>();
+  private onIceCandidateCallbacks = new Set<(callId: string, candidate: string) => void>();
+  private onCallEndedCallbacks = new Set<(callId: string, reason: string) => void>();
+
   async initialize() {
     try {
       const user = authService.authState.user;
@@ -185,6 +191,8 @@ class ChatServiceImpl {
     } finally {
       history.isLoading = false;
     }
+    // Trigger Svelte reactivity
+    this.chatHistories = new Map(this.chatHistories);
   }
 
   // Load more history (older messages) for pagination
@@ -287,6 +295,77 @@ class ChatServiceImpl {
     return () => this.onHistoryLoadedCallbacks.delete(callback);
   }
 
+  // WebRTC methods
+  async initiateCall(chatId: ChatId, offer: string): Promise<string> {
+    if (!this.registeredUser) {
+      throw new Error('Chat service not initialized');
+    }
+
+    return await this.registeredUser.InitiateCall(chatId, offer);
+  }
+
+  async answerCall(callId: string, answer: string): Promise<void> {
+    if (!this.registeredUser) {
+      throw new Error('Chat service not initialized');
+    }
+
+    await this.registeredUser.AnswerCall(callId, answer);
+  }
+
+  async sendIceCandidate(callId: string, candidate: string): Promise<void> {
+    if (!this.registeredUser) {
+      throw new Error('Chat service not initialized');
+    }
+
+    await this.registeredUser.SendIceCandidate(callId, candidate);
+  }
+
+  async endCall(callId: string): Promise<void> {
+    if (!this.registeredUser) {
+      throw new Error('Chat service not initialized');
+    }
+
+    await this.registeredUser.EndCall(callId);
+  }
+
+  // WebRTC event subscription methods
+  onCallInitiated(callback: (callId: string, chatId: ChatId, callerId: UserId, offer: string) => void) {
+    this.onCallInitiatedCallbacks.add(callback);
+    return () => this.onCallInitiatedCallbacks.delete(callback);
+  }
+
+  onCallAnswered(callback: (callId: string, answer: string) => void) {
+    this.onCallAnsweredCallbacks.add(callback);
+    return () => this.onCallAnsweredCallbacks.delete(callback);
+  }
+
+  onIceCandidate(callback: (callId: string, candidate: string) => void) {
+    this.onIceCandidateCallbacks.add(callback);
+    return () => this.onIceCandidateCallbacks.delete(callback);
+  }
+
+  onCallEnded(callback: (callId: string, reason: string) => void) {
+    this.onCallEndedCallbacks.add(callback);
+    return () => this.onCallEndedCallbacks.delete(callback);
+  }
+
+  // Public methods to trigger WebRTC callbacks (used by ChatListenerImpl)
+  triggerCallInitiated(callId: string, chatId: ChatId, callerId: UserId, offer: string): void {
+    this.onCallInitiatedCallbacks.forEach(callback => callback(callId, chatId, callerId, offer));
+  }
+
+  triggerCallAnswered(callId: string, answer: string): void {
+    this.onCallAnsweredCallbacks.forEach(callback => callback(callId, answer));
+  }
+
+  triggerIceCandidate(callId: string, candidate: string): void {
+    this.onIceCandidateCallbacks.forEach(callback => callback(callId, candidate));
+  }
+
+  triggerCallEnded(callId: string, reason: string): void {
+    this.onCallEndedCallbacks.forEach(callback => callback(callId, reason));
+  }
+
   // Get messages for a specific chat (from history or notifications)
   getMessagesForChat(chatId: ChatId): ChatMessage[] {
     const history = this.chatHistories.get(chatId);
@@ -384,6 +463,27 @@ class ChatListenerImpl extends _IChatListener_Servant {
 
   OnContactListUpdated(contacts: ContactList): void {
     this.chatService.onContactListUpdated(contacts);
+  }
+
+  // WebRTC event handlers
+  OnCallInitiated(callId: string, chatId: ChatId, callerId: UserId, offer: string): void {
+    console.log('Call initiated:', { callId, chatId, callerId });
+    this.chatService.triggerCallInitiated(callId, chatId, callerId, offer);
+  }
+
+  OnCallAnswered(callId: string, answer: string): void {
+    console.log('Call answered:', { callId });
+    this.chatService.triggerCallAnswered(callId, answer);
+  }
+
+  OnIceCandidate(callId: string, candidate: string): void {
+    console.log('ICE candidate received:', { callId });
+    this.chatService.triggerIceCandidate(callId, candidate);
+  }
+
+  OnCallEnded(callId: string, reason: string): void {
+    console.log('Call ended:', { callId, reason });
+    this.chatService.triggerCallEnded(callId, reason);
   }
 }
 

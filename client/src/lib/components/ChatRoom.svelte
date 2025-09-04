@@ -33,6 +33,235 @@
   let fileInputRef: HTMLInputElement;
   let messagesContainer: HTMLDivElement;
 
+  // WebRTC call state
+  let showCallModal = $state(false);
+  let isCallActive = $state(false);
+  let isCallConnecting = $state(false);
+  let callStatus = $state('Not connected');
+  let currentCallId = $state<string | null>(null);
+  let localVideo: HTMLVideoElement | undefined = $state();
+  let remoteVideo: HTMLVideoElement | undefined = $state();
+  let localStream: MediaStream | null = $state(null);
+  let remoteStream: MediaStream | null = $state(null);
+  let peerConnection: RTCPeerConnection | null = $state(null);
+
+  // WebRTC configuration
+  const rtcConfig = {
+    iceServers: [
+      {
+        urls: 'stun:stun.l.google.com:19302'
+      }
+    ]
+  };
+
+  // Request media permissions for camera and microphone
+  async function requestMediaPermissions() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      if (localVideo) {
+        localVideo.srcObject = localStream;
+      }
+      callStatus = 'Media ready - Click "Start Call"';
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      callStatus = 'Error: Could not access camera/microphone';
+    }
+  }
+
+  // Create and configure the RTCPeerConnection
+  async function createPeerConnection() {
+    peerConnection = new RTCPeerConnection(rtcConfig);
+
+    // Add local stream to peer connection
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        peerConnection?.addTrack(track, localStream!);
+      });
+    }
+
+    // Handle remote stream
+    peerConnection.ontrack = (event) => {
+      remoteStream = event.streams[0];
+      if (remoteVideo) {
+        remoteVideo.srcObject = remoteStream;
+      }
+    };
+
+    // Handle ICE candidates (trickling ICE)
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate && currentCallId) {
+        try {
+          await chatService.sendIceCandidate(currentCallId, JSON.stringify(event.candidate));
+        } catch (error) {
+          console.error('Error sending ICE candidate:', error);
+        }
+      }
+    };
+
+    // Handle ICE gathering state changes
+    peerConnection.onicegatheringstatechange = () => {
+      console.log('ICE gathering state:', peerConnection?.iceGatheringState);
+      if (peerConnection?.iceGatheringState === 'complete' && currentCallId) {
+        console.log('All ICE candidates gathered');
+        // Send a special "end-of-candidates" signal
+        chatService.sendIceCandidate(currentCallId, JSON.stringify({ candidate: null }))
+          .catch(error => console.error('Error sending end-of-candidates:', error));
+      }
+    };
+
+    // Connection state changes
+    peerConnection.onconnectionstatechange = () => {
+      callStatus = `Connection: ${peerConnection?.connectionState}`;
+      if (peerConnection?.connectionState === 'connected') {
+        isCallActive = true;
+        isCallConnecting = false;
+      }
+    };
+
+    return peerConnection;
+  }
+
+  async function startCall() {
+    try {
+      isCallConnecting = true;
+      callStatus = 'Requesting media permissions...';
+
+      await requestMediaPermissions();
+      await createPeerConnection();
+
+      callStatus = 'Creating offer...';
+      const offer = await peerConnection!.createOffer();
+      await peerConnection!.setLocalDescription(offer);
+
+      callStatus = 'Sending call invitation...';
+      currentCallId = await chatService.initiateCall(currentChatId, JSON.stringify(offer));
+
+      showCallModal = true;
+      callStatus = 'Call initiated! Waiting for answer...';
+    } catch (error: any) {
+      console.error('Error starting call:', error);
+      callStatus = 'Error starting call';
+      isCallConnecting = false;
+
+      if (error.name === 'ChatOperationFailed') {
+        alert('Cannot start call: ' + error.message);
+      } else {
+        alert('Failed to start call: ' + error.message);
+      }
+    }
+  }
+
+  async function startVideoCall() {
+    try {
+      isCallConnecting = true;
+      callStatus = 'Requesting media permissions...';
+
+      await requestMediaPermissions();
+      await createPeerConnection();
+
+      callStatus = 'Creating offer...';
+      const offer = await peerConnection!.createOffer();
+      await peerConnection!.setLocalDescription(offer);
+
+      callStatus = 'Sending call invitation...';
+      currentCallId = await chatService.initiateCall(currentChatId, JSON.stringify(offer));
+
+      showCallModal = true;
+      callStatus = 'Call initiated! Waiting for answer...';
+    } catch (error: any) {
+      console.error('Error starting call:', error);
+      callStatus = 'Error starting call';
+      isCallConnecting = false;
+
+      if (error.name === 'ChatOperationFailed') {
+        alert('Cannot start call: ' + error.message);
+      } else {
+        alert('Failed to start call: ' + error.message);
+      }
+    }
+  }
+
+  async function answerCall(callId: string, offer: string) {
+    try {
+      isCallConnecting = true;
+      callStatus = 'Requesting media permissions...';
+
+      await requestMediaPermissions();
+      await createPeerConnection();
+
+      currentCallId = callId;
+      callStatus = 'Processing offer...';
+
+      const offerObj = JSON.parse(offer);
+      await peerConnection!.setRemoteDescription(offerObj);
+
+      const answer = await peerConnection!.createAnswer();
+      await peerConnection!.setLocalDescription(answer);
+
+      callStatus = 'Sending answer...';
+      await chatService.answerCall(callId, JSON.stringify(answer));
+
+      showCallModal = true;
+      callStatus = 'Answer sent! Establishing connection...';
+    } catch (error: any) {
+      console.error('Error answering call:', error);
+      callStatus = 'Error answering call';
+      isCallConnecting = false;
+      alert('Failed to answer call: ' + error.message);
+    }
+  }
+
+  function endCall() {
+    if (peerConnection && currentCallId) {
+      chatService.endCall(currentCallId).catch(error => {
+        console.error('Error ending call:', error);
+      });
+    }
+
+    cleanupCall();
+  }
+
+  function cleanupCall() {
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+    if (remoteVideo) {
+      remoteVideo.srcObject = null;
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = null;
+    }
+    remoteStream = null;
+    isCallActive = false;
+    isCallConnecting = false;
+    currentCallId = null;
+    callStatus = 'Call ended';
+    showCallModal = false;
+  }
+
+  function toggleMute() {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+      }
+    }
+  }
+
+  function toggleVideo() {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+      }
+    }
+  }
+
   // Group messages by sender and time proximity
   function groupMessages(msgs: Message[]): MessageGroup[] {
     if (msgs.length === 0) return [];
@@ -313,11 +542,69 @@
     }
   });
 
+  // Subscribe to WebRTC call events
+  const unsubscribeCallInitiated = chatService.onCallInitiated(async (callId, chatId, callerId, offer) => {
+    if (chatId === currentChatId) {
+      // Show incoming call notification
+      const shouldAnswer = confirm('Incoming video call! Do you want to answer?');
+      if (shouldAnswer) {
+        await answerCall(callId, offer);
+      } else {
+        // Optionally decline the call
+        try {
+          await chatService.endCall(callId);
+        } catch (error) {
+          console.error('Error declining call:', error);
+        }
+      }
+    }
+  });
+
+  const unsubscribeCallAnswered = chatService.onCallAnswered(async (callId, answer) => {
+    if (callId === currentCallId && peerConnection) {
+      try {
+        const answerObj = JSON.parse(answer);
+        await peerConnection.setRemoteDescription(answerObj);
+        callStatus = 'Answer received! Establishing connection...';
+      } catch (error) {
+        console.error('Error processing answer:', error);
+        callStatus = 'Error processing answer';
+      }
+    }
+  });
+
+  const unsubscribeIceCandidate = chatService.onIceCandidate(async (callId, candidate) => {
+    if (callId === currentCallId && peerConnection) {
+      try {
+        const candidateObj = JSON.parse(candidate);
+        if (candidateObj.candidate === null) {
+          console.log('Received end-of-candidates signal');
+          // End-of-candidates received, no need to add null candidate
+          return;
+        }
+        await peerConnection.addIceCandidate(candidateObj);
+      } catch (error) {
+        console.error('Error adding ICE candidate:', error);
+      }
+    }
+  });
+
+  const unsubscribeCallEnded = chatService.onCallEnded(async (callId, reason) => {
+    if (callId === currentCallId) {
+      callStatus = `Call ended: ${reason}`;
+      cleanupCall();
+    }
+  });
+
   // Cleanup when component is destroyed
   $effect(() => {
     return () => {
       unsubscribeNewMessage();
       unsubscribeHistoryLoaded();
+      unsubscribeCallInitiated();
+      unsubscribeCallAnswered();
+      unsubscribeIceCandidate();
+      unsubscribeCallEnded();
       // Don't set activeChatId to null here - let the parent component handle it
     };
   });
@@ -328,8 +615,20 @@
   <div class="bg-white shadow-sm border-b border-gray-200 p-4 rounded-t-lg">
     <div class="flex justify-between items-center">
       <h1 class="text-xl font-semibold text-gray-900">Chat Room #{currentChatId}</h1>
-      <div class="text-sm text-gray-500">
-        {authService.authState.userData?.name}
+      <div class="flex items-center space-x-4">
+        <div class="text-sm text-gray-500">
+          {authService.authState.userData?.name}
+        </div>
+        <button
+          onclick={startVideoCall}
+          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors flex items-center space-x-2"
+          title="Start video call"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          <span>Call</span>
+        </button>
       </div>
     </div>
   </div>
@@ -527,4 +826,96 @@
       </form>
     </div>
   </div>
+
+  <!-- Video Call Modal -->
+  {#if showCallModal}
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
+        <!-- Modal Header -->
+        <div class="bg-gray-100 px-6 py-4 rounded-t-lg flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900">Video Call</h3>
+          <button
+            onclick={endCall}
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Call Status -->
+        <div class="px-6 py-2 bg-gray-50">
+          <p class="text-sm text-gray-600">{callStatus}</p>
+        </div>
+
+        <!-- Video Grid -->
+        <div class="p-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Local Video -->
+            <div class="relative">
+              <video
+                bind:this={localVideo}
+                autoplay
+                muted
+                playsinline
+                class="w-full h-64 bg-gray-900 rounded-lg object-cover"
+              ></video>
+              <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                You
+              </div>
+            </div>
+
+            <!-- Remote Video -->
+            <div class="relative">
+              <video
+                bind:this={remoteVideo}
+                autoplay
+                playsinline
+                class="w-full h-64 bg-gray-900 rounded-lg object-cover"
+              ></video>
+              <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                Remote
+              </div>
+            </div>
+          </div>
+
+          <!-- Call Controls -->
+          <div class="flex justify-center space-x-4 mt-6">
+            {#if isCallActive}
+              <button
+                onclick={toggleMute}
+                class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center space-x-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                </svg>
+                <span>Mute</span>
+              </button>
+
+              <button
+                onclick={toggleVideo}
+                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Video</span>
+              </button>
+            {/if}
+
+            <button
+              onclick={endCall}
+              class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m-6 6v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8a2 2 0 012-2h8a2 2 0 012 2z"></path>
+              </svg>
+              <span>End Call</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>

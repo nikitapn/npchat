@@ -64,6 +64,80 @@ private:
     }
   }
 
+  void on_call_initiated_impl(std::string_view callId, npchat::ChatId chatId, npchat::UserId callerId, npchat::UserId calleeId, std::string_view offer) {
+    // Find all participants of this chat
+    auto chat_it = chat_participants_.find(chatId);
+    if (chat_it == chat_participants_.end()) {
+      return; // Chat not found
+    }
+
+    // Notify all participants except the caller
+    for (auto userId : chat_it->second) {
+      if (userId == callerId) continue; // Don't notify caller
+
+      auto user_it = user_listeners_.find(userId);
+      if (user_it != user_listeners_.end()) {
+        for (auto* listener : user_it->second) {
+          try {
+            listener->OnCallInitiated({}, std::string(callId), chatId, callerId, std::string(offer));
+          } catch (nprpc::Exception&) {
+            // Remove disconnected listener - will be handled by cleanup
+          }
+        }
+      }
+    }
+  }
+
+  void on_call_answered_impl(std::string_view callId, std::string_view answer, npchat::UserId callerId) {
+    // Notify only the caller about the answer
+    auto user_it = user_listeners_.find(callerId);
+    if (user_it != user_listeners_.end()) {
+      for (auto* listener : user_it->second) {
+        try {
+          listener->OnCallAnswered({}, std::string(callId), std::string(answer));
+        } catch (nprpc::Exception&) {
+          // Remove disconnected listener - will be handled by cleanup
+        }
+      }
+    }
+  }
+
+  void on_ice_candidate_impl(std::string_view callId, std::string_view candidate, npchat::UserId targetUserId) {
+    // Notify the target user about the ICE candidate
+    auto user_it = user_listeners_.find(targetUserId);
+    if (user_it != user_listeners_.end()) {
+      for (auto* listener : user_it->second) {
+        try {
+          listener->OnIceCandidate({}, std::string(callId), std::string(candidate));
+        } catch (nprpc::Exception&) {
+          // Remove disconnected listener - will be handled by cleanup
+        }
+      }
+    }
+  }
+
+  void on_call_ended_impl(std::string_view callId, std::string_view reason, npchat::ChatId chatId) {
+    // Find all participants of this chat
+    auto chat_it = chat_participants_.find(chatId);
+    if (chat_it == chat_participants_.end()) {
+      return; // Chat not found
+    }
+
+    // Notify all participants
+    for (auto userId : chat_it->second) {
+      auto user_it = user_listeners_.find(userId);
+      if (user_it != user_listeners_.end()) {
+        for (auto* listener : user_it->second) {
+          try {
+            listener->OnCallEnded({}, std::string(callId), std::string(reason));
+          } catch (nprpc::Exception&) {
+            // Remove disconnected listener - will be handled by cleanup
+          }
+        }
+      }
+    }
+  }
+
 public:
   ChatObservers() : ObserversT<npchat::ChatListener>() {}
 
@@ -125,5 +199,25 @@ public:
   // Notify user about contact list changes
   void notify_contact_list_updated(std::uint32_t userId, const npchat::ContactList& contacts) {
     nplib::async<false>(executor(), &ChatObservers::on_contact_list_updated_impl, this, userId, contacts);
+  }
+
+  // Notify chat participants about call initiation
+  void notify_call_initiated(const std::string& callId, npchat::ChatId chatId, npchat::UserId callerId, npchat::UserId calleeId, const std::string& offer) {
+    nplib::async<false>(executor(), &ChatObservers::on_call_initiated_impl, this, callId, chatId, callerId, calleeId, offer);
+  }
+
+  // Notify caller about call answer
+  void notify_call_answered(std::string_view callId, std::string_view answer, npchat::UserId callerId) {
+    nplib::async<false>(executor(), &ChatObservers::on_call_answered_impl, this, callId, answer, callerId);
+  }
+
+  // Notify user about ICE candidate
+  void notify_ice_candidate(std::string_view callId, std::string_view candidate, npchat::UserId targetUserId) {
+    nplib::async<false>(executor(), &ChatObservers::on_ice_candidate_impl, this, callId, candidate, targetUserId);
+  }
+
+  // Notify chat participants about call ending
+  void notify_call_ended(std::string_view callId, std::string_view reason, npchat::ChatId chatId) {
+    nplib::async<false>(executor(), &ChatObservers::on_call_ended_impl, this, callId, reason, chatId);
   }
 };

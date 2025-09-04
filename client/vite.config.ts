@@ -51,4 +51,13 @@ export default defineConfig({
       'nprpc': path.resolve(__dirname, '../external/npsystem/nprpc/nprpc_js/dist/index.esm.js'),
     },
   },
+  server: {
+    host: '0.0.0.0',
+    allowedHosts: ['localhost', 'archvm.lan'],
+    https: {
+      key: '/home/nikita/projects/social/certs/archvm.lan.key',
+      cert: '/home/nikita/projects/social/certs/archvm.lan.crt',
+      dhparam: '/home/nikita/projects/social/certs/dhparam.pem'
+    }
+  }
 })

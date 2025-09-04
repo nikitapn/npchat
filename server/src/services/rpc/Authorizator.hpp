@@ -6,6 +6,7 @@ class ContactService;
 class MessageService;
 class ChatService;
 class ChatObservers;
+class WebRTCService;
 
 class AuthorizatorImpl : public npchat::IAuthorizator_Servant {
   nprpc::Rpc& rpc_;
@@ -14,6 +15,7 @@ class AuthorizatorImpl : public npchat::IAuthorizator_Servant {
   std::shared_ptr<MessageService> messageService_;
   std::shared_ptr<ChatService> chatService_;
   std::shared_ptr<ChatObservers> chatObservers_;
+  std::shared_ptr<WebRTCService> webrtcService_;
   nprpc::Poa* user_poa_;
 
 public:
@@ -22,7 +24,8 @@ public:
                    std::shared_ptr<ContactService> contactService,
                    std::shared_ptr<MessageService> messageService,
                    std::shared_ptr<ChatService> chatService,
-                   std::shared_ptr<ChatObservers> chatObservers);
+                   std::shared_ptr<ChatObservers> chatObservers,
+                   std::shared_ptr<WebRTCService> webrtcService);
 
   virtual npchat::UserData LogIn (::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password) override;
 

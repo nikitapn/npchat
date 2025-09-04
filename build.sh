@@ -24,7 +24,6 @@ CMD=(
 
 if [ $USE_SSL -eq 1 ]; then
     CMD+=(
-        --use-ssl
         --port 8443
         --public-cert certs/archvm.lan.crt
         --private-key certs/archvm.lan.key
