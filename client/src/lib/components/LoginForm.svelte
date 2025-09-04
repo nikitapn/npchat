@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { authService } from '../rpc/services/auth';
+  import { authService } from '../rpc/services/Auth';
 
   let email = $state('');
   let password = $state('');

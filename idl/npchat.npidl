@@ -76,6 +76,7 @@ ChatOperationFailed: exception {
 
 // User session data returned after successful authentication
 UserData: flat {
+  userId: UserId;         // Unique identifier for the authenticated user
   name: string;           // User's display name/username
   sessionId: string;      // Session identifier for subsequent requests
   registeredUser: object; // RPC object for accessing user-specific operations
@@ -161,6 +162,18 @@ interface RegisteredUser {
   // Returns: List of contacts with their IDs, usernames, and optional avatars
   // Note: Only returns contacts that have been explicitly added by the user
   ContactList GetContacts();
+
+  // Gets the current user's profile information
+  // Returns: Contact information for the authenticated user
+  Contact GetCurrentUser();
+
+  // Gets user profile information by user ID
+  // Parameters:
+  //   - userId: ID of the user to get information for
+  // Returns: Contact information for the specified user
+  // Raises: AuthorizationFailed if user doesn't exist
+  Contact GetUserById(userId: in UserId)
+    raises(AuthorizationFailed);
 
   // Searches for users by username or email to potentially add as contacts
   // Parameters:

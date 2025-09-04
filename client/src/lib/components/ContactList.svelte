@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RegisteredUser, Contact, ContactList } from '../rpc/npchat';
-  import { authService } from '../rpc/services/auth';
+  import { authService } from '../rpc/services/Auth';
 
   interface ContactListProps {
     registeredUser: RegisteredUser | null;

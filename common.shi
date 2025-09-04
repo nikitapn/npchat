@@ -4,3 +4,7 @@ source .env
 
 BUILD_DIR=.build_local/${BUILD_TYPE:-Debug}
 BUILD_TYPE=${BUILD_TYPE:-Debug}
+
+if [ "$BUILD_TYPE" == "Debug" ]; then
+  export CXXFLAGS="-DDEBUG -D_GLIBCXX_ASSERTIONS"
+fi

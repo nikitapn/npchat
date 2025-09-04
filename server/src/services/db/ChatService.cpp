@@ -450,6 +450,8 @@ bool ChatService::deleteChat(npchat::ChatId chat_id) {
   if (success) {
     // Remove from cache
     chat_participants_cache_.erase(chat_id);
+  } else {
+    spdlog::warn("[ChatService] Failed to execute DELETE: {}", sqlite3_errmsg(db_->getConnection()));
   }
 
   return success;

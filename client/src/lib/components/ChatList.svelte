@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RegisteredUser, Chat, ChatList, ChatId } from '../rpc/npchat';
   import { chatService } from '../rpc/services/Chat.svelte';
-  import { authService } from '../rpc/services/auth';
+  import { authService } from '../rpc/services/Auth';
   import ContextMenu, { type ContextMenuItem } from './ContextMenu.svelte';
   import { _ } from '../i18n';
 

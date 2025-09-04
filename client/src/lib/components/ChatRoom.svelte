@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ChatId, MessageId, ChatAttachment, ChatAttachmentType } from '../rpc/npchat';
-  import { authService } from '../rpc/services/auth';
+  import { authService } from '../rpc/services/Auth';
   import { chatService } from '../rpc/services/Chat.svelte';
   import VideoPlayer from './VideoPlayer.svelte';
   import { isVideoFile } from '../utils/shakaLoader';
@@ -64,6 +64,8 @@
         currentGroup!.messages.push(message);
       }
     }
+
+    console.log('Grouped messages:', groups);
 
     return groups;
   }
@@ -155,28 +157,44 @@
   }
 
   // Convert chat messages to UI messages
-  function updateMessages() {
+  async function updateMessages() {
     const chatMessages = chatService.getMessagesForChat(currentChatId);
-    messages = chatMessages.map(message => ({
-      id: message.timestamp, // Use timestamp as temp ID if no messageId available
-      text: message.content.text,
-      timestamp: new Date(message.timestamp),
-      sender: 'Other User', // TODO: Get actual sender name from user ID
-      attachment: message.content.attachment
+    const currentUserId = authService.authState.userData?.userId;
+
+    messages = await Promise.all(chatMessages.map(async (message) => {
+      let senderName = 'Unknown User';
+
+      if (message.senderId === currentUserId) {
+        senderName = authService.authState.userData?.name || 'You';
+      } else {
+        // Try to get sender name from cache or fetch from server
+        const contact = await chatService.getContactById(message.senderId);
+        if (contact) {
+          senderName = contact.username;
+        }
+      }
+
+      return {
+        id: message.messageId || message.timestamp, // Use messageId if available, fallback to timestamp
+        text: message.content.text,
+        timestamp: new Date(message.timestamp * 1000), // Convert Unix timestamp to Date
+        sender: senderName,
+        attachment: message.content.attachment
+      };
     }));
   }
 
   // Set this chat as active and load messages
   async function activateChat() {
     await chatService.setActiveChatId(currentChatId);
-    updateMessages();
+    await updateMessages();
   }
 
   // Load more history for pagination
   async function loadMoreHistory() {
     const canLoadMore = await chatService.loadMoreHistory(currentChatId);
     if (canLoadMore) {
-      updateMessages();
+      await updateMessages();
     }
     return canLoadMore;
   }
@@ -271,18 +289,27 @@
   // Initialize chat when component mounts
   activateChat();
 
+  // Effect to activate chat when currentChatId changes
+  $effect(() => {
+    if (currentChatId) {
+      // Clear messages when switching chats to avoid stale data
+      messages = [];
+      activateChat();
+    }
+  });
+
   // Subscribe to new messages for this chat
-  const unsubscribeNewMessage = chatService.onNewMessage((notification) => {
+  const unsubscribeNewMessage = chatService.onNewMessage(async (notification) => {
     if (notification.chatId === currentChatId) {
       // Update messages from the service (which now includes history)
-      updateMessages();
+      await updateMessages();
     }
   });
 
   // Subscribe to history loaded events
-  const unsubscribeHistoryLoaded = chatService.onHistoryLoaded((chatId, history) => {
+  const unsubscribeHistoryLoaded = chatService.onHistoryLoaded(async (chatId, history) => {
     if (chatId === currentChatId) {
-      updateMessages();
+      await updateMessages();
     }
   });
 

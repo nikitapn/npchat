@@ -5,7 +5,7 @@
   import ChatApp from './lib/components/ChatApp.svelte';
   import LanguageSelector from './lib/components/LanguageSelector.svelte';
   import { router } from './lib/Router.svelte';
-  import { authService } from './lib/rpc/services/auth';
+  import { authService } from './lib/rpc/services/Auth';
   import { _ } from './lib/i18n';
 
   // Subscribe to auth state

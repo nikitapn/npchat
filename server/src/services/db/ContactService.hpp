@@ -33,9 +33,10 @@ public:
 
   bool addContact(std::uint32_t owner_id, std::uint32_t contact_id);
   bool addContactByUsername(std::uint32_t owner_id, const std::string& username);
-  std::vector<npchat::Contact> getContacts(std::uint32_t owner_id);
+
   std::optional<npchat::Contact> getContact(std::uint32_t owner_id, std::uint32_t contact_id);
   std::optional<npchat::Contact> getContactByUsername(std::uint32_t owner_id, const std::string& username);
+  std::vector<npchat::Contact> getContacts(std::uint32_t owner_id);
   bool removeContact(std::uint32_t owner_id, std::uint32_t contact_id);
   bool blockContact(std::uint32_t owner_id, std::uint32_t contact_id);
   bool unblockContact(std::uint32_t owner_id, std::uint32_t contact_id);

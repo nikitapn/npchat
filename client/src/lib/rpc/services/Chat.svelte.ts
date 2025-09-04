@@ -1,7 +1,12 @@
-import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList, ChatAttachment, ChatMessageContent } from '../npchat';
+import type {
+  UserId,
+  Contact,
+  RegisteredUser,
+  ChatMessage,
+  ChatId, MessageId, ContactList, ChatAttachment, ChatMessageContent } from '../npchat';
 import { _IChatListener_Servant } from '../npchat';
 import { poa } from '../index';
-import { authService } from './auth';
+import { authService } from './Auth';
 
 interface ChatNotification {
   chatId: ChatId;
@@ -44,6 +49,9 @@ class ChatServiceImpl {
   private onNewMessageCallbacks = new Set<(notification: ChatNotification) => void>();
   private onChatUpdateCallbacks = new Set<(chatId: ChatId, update: ChatUpdate) => void>();
   private onHistoryLoadedCallbacks = new Set<(chatId: ChatId, history: ChatHistory) => void>();
+
+  // Local cache of contacts
+  private contacts = new Map<UserId, Contact>();
 
   async initialize() {
     try {
@@ -336,6 +344,28 @@ class ChatServiceImpl {
     });
     return total;
   }
+
+  // Get contact details by user ID
+  async getContactById(userId: UserId): Promise<Contact | null> {
+    if (this.contacts.has(userId)) {
+      return this.contacts.get(userId)!;
+    }
+
+    if (!this.registeredUser) {
+      throw new Error('Chat service not initialized');
+    }
+
+    try {
+      const contact = await this.registeredUser.GetUserById(userId);
+      // Cache the result
+      this.contacts.set(userId, contact);
+      return contact;
+    } catch (error) {
+      console.error('Failed to get user by ID:', userId, error);
+      return null;
+    }
+  }
+
 }
 
 // Implementation of ChatListener that integrates with the service

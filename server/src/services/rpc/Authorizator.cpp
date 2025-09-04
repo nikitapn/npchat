@@ -34,7 +34,7 @@ npchat::UserData AuthorizatorImpl::LogIn (::nprpc::flat::Span<char> login, ::npr
 
   // Create a new RegisteredUser object
   auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_,
-                                               chatService_, chatObservers_, userId);
+                                               chatService_, chatObservers_, authService_, userId);
 
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser,
@@ -56,7 +56,7 @@ npchat::UserData AuthorizatorImpl::LogInWithSessionId (::nprpc::flat::Span<char>
 
   // Create a new RegisteredUser object
   auto registeredUser = new RegisteredUserImpl(rpc_, contactService_, messageService_,
-                                               chatService_, chatObservers_, userId);
+                                               chatService_, chatObservers_, authService_, userId);
 
   // Activate the object with the POA
   auto oid = user_poa_->activate_object(registeredUser,

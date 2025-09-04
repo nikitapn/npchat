@@ -1,9 +1,9 @@
 import * as NPRPC from 'nprpc';
 import { Authorizator, AuthorizationFailed, RegistrationFailed, AuthorizationError, RegistrationError } from '../npchat';
-import type { UserData } from '../npchat';
+import type { UserData, UserId } from '../npchat';
 import { RegisteredUser } from '../npchat';
 import { authorizator } from '../index';
-import { sessionManager, SecurityUtils } from './session';
+import { sessionManager, SecurityUtils } from './Session';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -358,16 +358,11 @@ export class AuthService {
   }
 
   // Method to get current user ID
-  // TODO: Implement proper user ID retrieval from session or server
-  // Currently returns a hardcoded value until we store user ID during authentication
-  getCurrentUserId(): number {
-    if (!this._authState.isAuthenticated) {
+  getCurrentUserId(): UserId {
+    if (!this._authState.isAuthenticated || !this._authState.userData) {
       throw new Error('User is not authenticated');
     }
-
-    // For now, return a hardcoded user ID until we implement proper user ID storage
-    // In a real app, this would be stored during login or retrieved from the server
-    return 1;
+    return this._authState.userData.userId;
   }
 }
 

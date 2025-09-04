@@ -55,6 +55,9 @@ AuthService::AuthService(const std::shared_ptr<Database>& database) : db_(databa
     "JOIN user_sessions s ON u.id = s.user_id "
     "WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1");
 
+  get_user_by_id_stmt_ = db_->prepareStatement(
+    "SELECT id, username, email FROM users WHERE id = ? AND is_active = 1");
+
   insert_session_stmt_ = db_->prepareStatement(
     "INSERT INTO user_sessions (user_id, session_token, created_at, expires_at, last_activity) VALUES (?, ?, ?, ?, ?)");
 
@@ -93,6 +96,7 @@ AuthService::~AuthService() {
   sqlite3_finalize(insert_user_stmt_);
   sqlite3_finalize(get_user_by_login_stmt_);
   sqlite3_finalize(get_user_by_session_stmt_);
+  sqlite3_finalize(get_user_by_id_stmt_);
   sqlite3_finalize(insert_session_stmt_);
   sqlite3_finalize(update_session_stmt_);
   sqlite3_finalize(delete_session_stmt_);
@@ -136,6 +140,7 @@ npchat::UserData AuthService::logIn(std::string_view login, std::string_view pas
       active_sessions_[session_id] = user_id;
 
       npchat::UserData user_data;
+      user_data.userId = user_id;
       user_data.name = username;
       user_data.sessionId = session_id;
       // user_data.registeredUser will be set by the caller
@@ -157,10 +162,12 @@ npchat::UserData AuthService::logInWithSessionId(std::string_view session_id) {
     sqlite3_bind_int64(get_user_by_session_stmt_, 2, currentTimestamp());
 
     if (sqlite3_step(get_user_by_session_stmt_) == SQLITE_ROW) {
+      uint32_t user_id = sqlite3_column_int(get_user_by_session_stmt_, 0);
       std::string username = reinterpret_cast<const char*>(sqlite3_column_text(get_user_by_session_stmt_, 1));
       sqlite3_reset(get_user_by_session_stmt_);
 
       npchat::UserData user_data;
+      user_data.userId = user_id;
       user_data.name = username;
       user_data.sessionId = session_str;
       return user_data;
@@ -210,6 +217,24 @@ std::uint32_t AuthService::getUserIdFromLogin(std::string_view login) {
 
   sqlite3_reset(get_user_by_login_stmt_);
   throw npchat::AuthorizationFailed{npchat::AuthorizationError::InvalidCredentials};
+}
+
+std::optional<npchat::Contact> AuthService::getUserById(std::uint32_t user_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  sqlite3_bind_int(get_user_by_id_stmt_, 1, user_id);
+
+  if (sqlite3_step(get_user_by_id_stmt_) == SQLITE_ROW) {
+    npchat::Contact contact;
+    contact.id = sqlite3_column_int(get_user_by_id_stmt_, 0);
+    contact.username = reinterpret_cast<const char*>(sqlite3_column_text(get_user_by_id_stmt_, 1));
+    contact.avatar = std::nullopt; // No avatar support yet
+    sqlite3_reset(get_user_by_id_stmt_);
+    return contact;
+  }
+
+  sqlite3_reset(get_user_by_id_stmt_);
+  return std::nullopt;
 }
 
 bool AuthService::logOut(std::string_view session_id) {

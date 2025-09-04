@@ -2,6 +2,7 @@
 #include "services/db/ContactService.hpp"
 #include "services/db/MessageService.hpp"
 #include "services/db/ChatService.hpp"
+#include "services/db/AuthService.hpp"
 #include "services/client/ChatObserver.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -11,12 +12,14 @@ RegisteredUserImpl::RegisteredUserImpl(nprpc::Rpc& rpc,
                                        std::shared_ptr<MessageService> messageService,
                                        std::shared_ptr<ChatService> chatService,
                                        std::shared_ptr<ChatObservers> chatObservers,
+                                       std::shared_ptr<AuthService> authService,
                                        std::uint32_t userId)
   : rpc_(rpc)
   , contactService_(contactService)
   , messageService_(messageService)
   , chatService_(chatService)
   , chatObservers_(chatObservers)
+  , authService_(authService)
   , userId_(userId)
 {
   spdlog::info("RegisteredUser created for user ID: {}", userId_);
@@ -78,6 +81,42 @@ void RegisteredUserImpl::RemoveContact(npchat::UserId contactUserId) {
     }
   } catch (const std::exception& e) {
     spdlog::error("Error removing contact {} for user ID {}: {}", contactUserId, userId_, e.what());
+    throw;
+  }
+}
+
+npchat::Contact RegisteredUserImpl::GetCurrentUser() {
+  spdlog::info("GetCurrentUser called for user ID: {}", userId_);
+
+  try {
+    auto user = authService_->getUserById(userId_);
+    if (user) {
+      spdlog::info("Retrieved current user info for user ID: {}", userId_);
+      return *user;
+    } else {
+      spdlog::error("User not found for ID: {}", userId_);
+      throw npchat::ChatOperationFailed{npchat::ChatError::UserNotParticipant};
+    }
+  } catch (const std::exception& e) {
+    spdlog::error("Error getting current user for ID {}: {}", userId_, e.what());
+    throw;
+  }
+}
+
+npchat::Contact RegisteredUserImpl::GetUserById(npchat::UserId userId) {
+  spdlog::info("GetUserById called for user ID: {} by user ID: {}", userId, userId_);
+
+  try {
+    auto user = authService_->getUserById(userId);
+    if (user) {
+      spdlog::info("Retrieved user info for user ID: {}", userId);
+      return *user;
+    } else {
+      spdlog::error("User not found for ID: {}", userId);
+      throw npchat::AuthorizationFailed{npchat::AuthorizationError::AccessDenied};
+    }
+  } catch (const std::exception& e) {
+    spdlog::error("Error getting user for ID {}: {}", userId, e.what());
     throw;
   }
 }

@@ -44,6 +44,7 @@ private:
   sqlite3_stmt* insert_user_stmt_;
   sqlite3_stmt* get_user_by_login_stmt_;
   sqlite3_stmt* get_user_by_session_stmt_;
+  sqlite3_stmt* get_user_by_id_stmt_;
   sqlite3_stmt* insert_session_stmt_;
   sqlite3_stmt* update_session_stmt_;
   sqlite3_stmt* delete_session_stmt_;
@@ -72,6 +73,9 @@ public:
   std::uint32_t getUserIdFromSession(std::string_view session_id);
   std::uint32_t getUserIdFromLogin(std::string_view login);
   bool logOut(std::string_view session_id);
+
+  // User information methods
+  std::optional<npchat::Contact> getUserById(std::uint32_t user_id);
 
   // Registration methods
   bool checkUsername(std::string_view username);

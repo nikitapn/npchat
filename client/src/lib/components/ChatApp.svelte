@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RegisteredUser, ChatId, Contact } from '../rpc/npchat';
-  import { authService } from '../rpc/services/auth';
+  import { authService } from '../rpc/services/Auth';
   import { chatService } from '../rpc/services/Chat.svelte';
   import ContactList from './ContactList.svelte';
   import ChatList from './ChatList.svelte';

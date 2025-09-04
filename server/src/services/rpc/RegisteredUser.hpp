@@ -6,6 +6,7 @@ class ContactService;
 class MessageService;
 class ChatService;
 class ChatObservers;
+class AuthService;
 
 class RegisteredUserImpl : public npchat::IRegisteredUser_Servant {
   nprpc::Rpc& rpc_;
@@ -13,6 +14,7 @@ class RegisteredUserImpl : public npchat::IRegisteredUser_Servant {
   std::shared_ptr<MessageService> messageService_;
   std::shared_ptr<ChatService> chatService_;
   std::shared_ptr<ChatObservers> chatObservers_;
+  std::shared_ptr<AuthService> authService_;
   std::uint32_t userId_;
 
 public:
@@ -21,6 +23,7 @@ public:
                      std::shared_ptr<MessageService> messageService,
                      std::shared_ptr<ChatService> chatService,
                      std::shared_ptr<ChatObservers> chatObservers,
+                     std::shared_ptr<AuthService> authService,
                      std::uint32_t userId);
 
   // Contact management
@@ -28,6 +31,12 @@ public:
   virtual npchat::ContactList SearchUsers(::nprpc::flat::Span<char> query, std::uint32_t limit) override;
   virtual void AddContact(npchat::UserId userId) override;
   virtual void RemoveContact(npchat::UserId userId) override;
+
+  // Get current user information
+  virtual npchat::Contact GetCurrentUser() override;
+
+  // Get user information by ID
+  virtual npchat::Contact GetUserById(npchat::UserId userId) override;
 
   // Chat management
   virtual npchat::ChatList GetChats() override;

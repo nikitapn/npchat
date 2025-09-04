@@ -1,7 +1,7 @@
 import type { RegisteredUser, ChatMessage, ChatId, MessageId, ContactList } from '../npchat';
 import { _IChatListener_Servant } from '../npchat';
 import { poa } from '../index';
-import { authService } from './auth';
+import { authService } from './Auth';
 
 interface SessionManager {
   // Enhanced session management with proper security

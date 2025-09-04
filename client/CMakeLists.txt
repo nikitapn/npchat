@@ -69,3 +69,10 @@ add_custom_target(npchat_js ALL
     ${CLIENT_BUILD_STAMP}
     npchat_stub_gen
 )
+
+# Help target to generate stubs and copy them to the client source directory
+add_custom_target(gen_stubs ALL
+  DEPENDS
+    npchat_stub_gen
+    ${SOCIAL_DST}
+)

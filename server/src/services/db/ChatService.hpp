@@ -37,31 +37,28 @@ public:
   explicit ChatService(const std::shared_ptr<Database>& database);
   ~ChatService();
 
+  // Create a new chat with participants
   std::uint32_t createChat(std::uint32_t creator_id, const std::vector<std::uint32_t>& participant_ids);
-
+  // Send a message in a chat
   npchat::MessageId sendMessage(std::uint32_t sender_id, npchat::ChatId chat_id, const npchat::ChatMessageContent& content);
-
+  // Retrieve messages in a chat with pagination
   std::vector<npchat::ChatMessage> getMessages(npchat::ChatId chat_id, std::uint32_t limit = 50, std::uint32_t offset = 0);
-
+  // Get a message by its ID
   std::optional<npchat::ChatMessage> getMessageById(npchat::MessageId message_id);
-
+  // Mark a message as delivered to a user
   void markMessageDelivered(npchat::MessageId message_id, std::uint32_t user_id);
-
+  // Get list of participant user IDs in a chat
   std::vector<std::uint32_t> getChatParticipants(npchat::ChatId chat_id);
-
+  // Get list of chat IDs a user is part of
   std::vector<npchat::ChatId> getUserChats(std::uint32_t user_id);
-
+  // Get detailed chat info for a user
   npchat::ChatList getUserChatsWithDetails(std::uint32_t user_id);
-
   // Find existing chat between two users, or create a new one
   npchat::ChatId findOrCreateChatBetween(std::uint32_t user1_id, std::uint32_t user2_id);
-
   // Remove a participant from a chat
   bool removeParticipant(std::uint32_t requesting_user_id, npchat::ChatId chat_id, std::uint32_t participant_id);
-
   // Delete an entire chat (used when last participant leaves)
   bool deleteChat(npchat::ChatId chat_id);
-
   // Get chat creator ID
   std::uint32_t getChatCreator(npchat::ChatId chat_id);
 };

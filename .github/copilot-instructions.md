@@ -56,6 +56,9 @@ This is a **hybrid C++/Svelte WebRTC chat application** with a comprehensive rea
 # Build and start the backend server (runs the server after build)
 ./build.sh run
 
+# Build helper target to generate RPC stubs and copy them to the client source directory
+./gen_stubs.sh
+
 # Frontend development server (optimized build system)
 # This is useful for hot-reloading during UI development
 # and it seamlessly integrates with the C++ backend (make sure backend is running)
