@@ -46,7 +46,7 @@
   let peerConnection: RTCPeerConnection | null = $state(null);
 
   // WebRTC configuration
-  const rtcConfig = {
+  const rtcConfig: RTCConfiguration = {
     iceServers: [
       {
         urls: 'stun:stun.l.google.com:19302'

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <nprpc/nprpc.hpp>
-#include "util/util.hpp"
+#include <nplib/utils/thread_pool.hpp>
 
 template <typename T>
 requires std::is_base_of_v<nprpc::Object, T>

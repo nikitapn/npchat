@@ -12,7 +12,7 @@ WebRTCService::~WebRTCService() {
 }
 
 std::string WebRTCService::generateCallId() {
-  std::random_device rd;
+  thread_local static std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis(0, 15);
 

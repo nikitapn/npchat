@@ -29,8 +29,6 @@
 #include "services/rpc/Authorizator.hpp"
 #include "services/client/ChatObserver.hpp"
 
-#include "util/util.hpp"
-
 DEFINE_HOST_JSON_STRUCT(authorizator)
 
 int main(int argc, char *argv[]) {

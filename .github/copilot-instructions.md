@@ -64,7 +64,17 @@ This is a **hybrid C++/Svelte WebRTC chat application** with a comprehensive rea
 # and it seamlessly integrates with the C++ backend (make sure backend is running)
 cd client && npm run dev
 
-# Docker build is not properly set up yet
+# Docker build (for production deployment)
+./01_docker_build.sh
+# Creating runtime package
+./02_pack_runtime.sh
+# Deployment to server (example)
+./03_deploy.sh
+Options for deploy.sh:
+  -h <hostname>          - Hostname of the server
+  -s -c -d               - Copy server, client, database
+  -w /home/debian/npchat - Working directory on remote server
+  <user>@<hostname>:/home/debian/temp/npchat - Temporary upload location
 ```
 
 ### Optimized Build System
