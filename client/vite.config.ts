@@ -42,8 +42,8 @@ export default defineConfig({
     }
   ],
   build: {
-    sourcemap: true, // Enable source maps for production builds
-    minify: false,   // Disable minification for easier debugging (optional)
+    // sourcemap: true, // Enable source maps for production builds
+    // minify: false,   // Disable minification for easier debugging (optional)
   },
   resolve: {
     alias: {

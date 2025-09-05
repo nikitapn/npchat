@@ -45,14 +45,10 @@
   let remoteStream: MediaStream | null = $state(null);
   let peerConnection: RTCPeerConnection | null = $state(null);
 
-  // WebRTC configuration
-  const rtcConfig: RTCConfiguration = {
-    iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302'
-      }
-    ]
-  };
+  // WebRTC configuration (from Vite env)
+  import { getRtcConfig } from '@lib/config/webrtc';
+  const rtcConfig: RTCConfiguration = getRtcConfig();
+  console.log('Using RTC config:', rtcConfig);
 
   // Request media permissions for camera and microphone
   async function requestMediaPermissions() {

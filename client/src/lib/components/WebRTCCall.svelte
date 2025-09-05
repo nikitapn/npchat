@@ -1,19 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  interface IceServer {
-    urls: string | string[];
-    username?: string;
-    credential?: string;
-  }
-
-  // WebRTC configuration with your STUN server
-  let rtcConfig = $state<{iceServers: Array<IceServer>}>({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' }, // Fallback Google STUN
-      // Add your VPS STUN server here - replace with your server details
-    ]
-  });
+  import { getRtcConfig } from '@lib/config/webrtc';
+  // WebRTC configuration (from Vite env)
+  let rtcConfig = $state<RTCConfiguration>(getRtcConfig());
 
   // Video elements and state
   let localVideo: HTMLVideoElement;
@@ -58,9 +48,11 @@
 
   function addCustomStunServer() {
     if (customStunServer.trim()) {
-      rtcConfig.iceServers.push({ urls: `stun:${customStunServer.trim()}` });
-      customStunServer = '';
+      const copy = structuredClone(rtcConfig);
+      (copy.iceServers ||= []).push({ urls: `stun:${customStunServer.trim()}` });
+      rtcConfig = copy;
       connectionStatus = `Added STUN server: ${customStunServer}`;
+      customStunServer = '';
     }
   }
 
@@ -248,7 +240,7 @@
           <div>
             <p class="block text-sm font-medium text-gray-700 mb-2">Current STUN Servers:</p>
             <div class="text-sm text-gray-600">
-              {#each rtcConfig.iceServers as server}
+              {#each rtcConfig.iceServers! as server}
                 <div class="bg-gray-100 p-2 rounded mb-1">{server.urls}</div>
               {/each}
             </div>
