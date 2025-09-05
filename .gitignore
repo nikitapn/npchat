@@ -1,2 +1,5 @@
 /.build_local
+/.build_docker
 /sample_data
+/artifacts
+/deploy.sh

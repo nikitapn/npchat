@@ -2,32 +2,32 @@
 
 set -e
 
-BUILD_DIR=.build
+BUILD_DIR=.build_docker
 ROOT_DIR=$(dirname $(readlink -e ${BASH_SOURCE[0]}))
 
 cd $ROOT_DIR
-mkdir -p runtime/out
+mkdir -p artifacts/out
 
 docker run --rm \
   -v $ROOT_DIR/${BUILD_DIR}/bin:/app \
   -v $ROOT_DIR/docker/scripts:/cmd \
-  -v $ROOT_DIR/runtime/out:/runtime \
+  -v $ROOT_DIR/artifacts/out:/out \
   -w /cmd \
   cpp-dev-env:latest \
   ./collect_boost.sh
 
 set -ex
 
-cp ${BUILD_DIR}/release/npchat runtime/out
-cp ${BUILD_DIR}/external/npsystem/nplib/libnplib.so runtime/out
-cp ${BUILD_DIR}/external/npsystem/nprpc/libnprpc.so runtime/out
-cp docker/Dockerfile.runtime runtime/out
+cp ${BUILD_DIR}/bin/npchat                            artifacts/out
+cp ${BUILD_DIR}/external/npsystem/nplib/libnplib.so   artifacts/out
+cp ${BUILD_DIR}/external/npsystem/nprpc/libnprpc.so   artifacts/out
+cp docker/Dockerfile.runtime                          artifacts/out
 
-cd runtime
+cd artifacts
 tar -czf npchat-server.tar.gz out/
 
-[ ! -L "www" ] && ln -s ../client/public www
+cp -r ../client/dist www
 tar -czhf npchat-client.tar.gz www/
 
-[ ! -L "data" ] && ln -s ../sample_data data
+cp -r ../sample_data data
 tar -czhf npchat-data.tar.gz data/
